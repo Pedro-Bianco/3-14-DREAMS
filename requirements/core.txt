@@ -1,0 +1,37 @@
+# PI dreams core dependencies — only packages imported by pidreams/.
+# Versions pinned from the environment validated on 2026-10-16.
+numpy==2.4.4
+sounddevice==0.5.5
+faster-whisper==1.2.1
+ctranslate2==4.7.1
+piper-tts==1.4.2
+onnxruntime==1.29.0
+num2words==0.5.14
+ollama==0.6.1
+qdrant-client==1.17.1
+fastembed==0.7.4
+# 4.x: 5.0 brought no gain and the 4 line is the stable one (tested on 2026-10-16)
+opencv-python==4.14.0.94
+pillow==11.3.0
+psutil==7.2.2
+# MCP client and servers; v2 stable since 2026-07, v1 only gets fixes.
+mcp==2.3.0
+# Google Calendar through the iCal link: reading, recurrences and time zones (Windows
+# does not ship the time zone table zoneinfo uses).
+icalendar==7.3.0
+recurring-ical-events==3.8.2
+# Text of PDFs saved to the knowledge base (pure Python, no dependencies). Office files are
+# read straight from their zip/XML, without libraries.
+pypdf==6.21.4
+tzdata==2026.5
+pyperclip==1.11.0
+# Monitoramento: satellite positions from orbital elements (SGP4) and MP3 radio decoding.
+# miniaudio (0.27 MB) instead of PyAV (28 MB): MP3 covers 65% of the radios with coordinates.
+sgp4==2.27
+miniaudio==1.71
+# Knowledge-base text splitting (modes chosen in the KB tab).
+# To revisit: the "html" mode no longer worked (lxml is missing) and "token"
+# (tiktoken) downloads data from the internet on first use.
+langchain-text-splitters==1.1.2
+langchain-experimental==0.4.1
+tiktoken==0.12.0
