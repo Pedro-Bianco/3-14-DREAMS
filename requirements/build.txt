@@ -1,0 +1,4 @@
+# Development and build tools (not shipped in the installer).
+-r core.txt
+pytest==8.4.2
+pyinstaller==6.16.0

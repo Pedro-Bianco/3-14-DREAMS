@@ -1,0 +1,39 @@
+# Virtual environment
+.venv/
+
+# Models (default voice in models/piper, copied by the installer; the rest lives in %LOCALAPPDATA%)
+models/
+*.onnx
+*.onnx.json
+*.pt
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment variables
+.env
+
+# VS Code
+.vscode/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Personal data and credentials (LTM/KB memory)
+data/
+
+
+# Build output and development environments
+dist/
+build/
+installer/Output/
+.venv-dev/
+*.spec.bak
+
