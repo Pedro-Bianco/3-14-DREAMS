@@ -89,11 +89,16 @@ def _list(eventos, tz) -> str:
     return "\n".join(texto for _, texto in lines[:_MAX_EVENTS]) + cutoff
 
 
+def local_zone() -> dt.tzinfo:
+    """The computer's time zone: events are told in the user's local time."""
+    return dt.datetime.now().astimezone().tzinfo
+
+
 @SERVER.tool(annotations=ToolAnnotations(read_only_hint=True))
 def eventos(inicio: str = "hoje", dias: int = 1) -> str:
     """Compromissos a partir de um dia. inicio: hoje, amanhã, depois de amanhã, um dia da semana
     (segunda…domingo = o próximo) ou AAAA-MM-DD; dias: quantos dias a partir dele (7 = a semana)."""
-    tz = dt.datetime.now().astimezone().tzinfo
+    tz = local_zone()
     first = resolve_day(inicio, dt.date.today())
     dias = max(1, min(int(dias), 62))
     a = dt.datetime.combine(first, dt.time(), tz)
@@ -106,7 +111,7 @@ def eventos(inicio: str = "hoje", dias: int = 1) -> str:
 def buscar_eventos(texto: str, dias_a_frente: int = 120, dias_atras: int = 30) -> str:
     """Acha compromissos pelo nome, local ou descrição (ex.: dentista, reunião do projeto),
     entre dias_atras dias atrás e dias_a_frente dias à frente."""
-    tz = dt.datetime.now().astimezone().tzinfo
+    tz = local_zone()
     now = dt.datetime.now(tz)
     wanted = _strip_accents(texto)
     found = [e for e in recurring_ical_events.of(_calendar()).between(

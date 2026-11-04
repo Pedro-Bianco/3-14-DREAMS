@@ -94,6 +94,7 @@ def test_tela_salva_e_recusa_invalido_sem_gravar_pela_metade(st, fake_sound, mon
 
     monkeypatch.setattr("pidreams.ui.settings_dialog._installed_models", lambda: ["qwen2.5:7b"])
     monkeypatch.setattr("pidreams.hardware.models.kokoro_present", lambda: True)   # no voice download first
+    monkeypatch.setattr("pidreams.hardware.models.pocket_present", lambda: True)
     root_dir = create_window(tk.Tk)
     try:
         screen = SettingsDialog(root_dir, st)

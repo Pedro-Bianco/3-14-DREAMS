@@ -14,6 +14,14 @@ from mcp import Client
 from pidreams.mcp import ical_calendar
 
 TODAY = dt.date.today()
+
+
+@pytest.fixture(autouse=True)
+def _sao_paulo_time(monkeypatch):
+    """The fictitious agenda is in São Paulo time: the result must not depend on the machine's zone
+    (GitHub's runners are on UTC and showed every event 3 hours later)."""
+    from zoneinfo import ZoneInfo
+    monkeypatch.setattr(ical_calendar, "local_zone", lambda: ZoneInfo("America/Sao_Paulo"))
 MON = TODAY + dt.timedelta(days=(0 - TODAY.weekday()) % 7 or 7)          # próxima segunda (não hoje)
 
 

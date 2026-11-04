@@ -23,6 +23,7 @@ def _voices_present(monkeypatch):
     """Without the voice files, saving downloads them first (a fresh machine, as in CI)."""
     from pidreams.hardware import models
     monkeypatch.setattr(models, "kokoro_present", lambda: True)
+    monkeypatch.setattr(models, "pocket_present", lambda: True)
 
 
 def _dialog(tk_root, tmp_path, **values):
