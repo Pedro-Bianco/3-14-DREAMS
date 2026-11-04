@@ -1,0 +1,14 @@
+[
+  {
+    "MatchingDeviceId": "PCI\\VEN_8086&DEV_A788&SUBSYS_00000000",
+    "DriverDesc": "Intel(R) UHD Graphics 770",
+    "DriverVersion": "31.0.101.5186",
+    "HardwareInformation.qwMemorySize": 134217728
+  },
+  {
+    "MatchingDeviceId": "PCI\\VEN_10DE&DEV_28E0&SUBSYS_00000000",
+    "DriverDesc": "NVIDIA GeForce RTX 4060 Laptop GPU",
+    "DriverVersion": "32.0.15.6094",
+    "HardwareInformation.qwMemorySize": 8589934592
+  }
+]

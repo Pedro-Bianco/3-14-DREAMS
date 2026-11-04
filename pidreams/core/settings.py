@@ -22,10 +22,10 @@ DEFAULTS: dict[str, Any] = {
     "first_run_done": False,
     "assistant_name": "PI dreams",
     "treatment": "",
-    "persona_id": "jarvis",
+    "persona_id": "espirituoso",
     "appearance": "rosto",       # id from pidreams/ui/appearances (unknown = rosto)
     "audio": {"input_device": None, "output_device": None, "volume": 1.0},
-    "voice": {"model": "pt_BR-faber-medium", "length_scale": 1.0},
+    "voice": {"model": "pocket-baritono", "length_scale": 1.0, "effect": "forte"},   # effect: "" = off
     "weather": {"city": ""},
     "llm": {"model": None},
     "ollama": {"host": "http://127.0.0.1:11434", "timeout_s": 600.0},
@@ -37,8 +37,9 @@ DEFAULTS: dict[str, Any] = {
     # MCP connections: folders allowed for the files server and, per server, whether
     # it is on and how to start it. Stored keys stay in Portuguese (saved format).
     "mcp": {"pastas": [], "servers": {}},
-    # Briefing on open: once a day, only with the parts that are on and configured.
-    "resumo": {"ligado": True, "clima": True, "agenda": True, "emails": True, "lembretes": True},
+    # Briefing on open: once a day (or every time, with toda_vez), only with the parts that are on
+    # and configured.
+    "resumo": {"ligado": True, "toda_vez": False, "clima": True, "agenda": True, "emails": True, "lembretes": True},
     # Main window as it was last closed; empty geometry = first opening (centered).
     "window": {"geometry": "", "zoomed": False},
 }
@@ -50,6 +51,8 @@ _RANGES = {
     "ollama.timeout_s": (10.0, 1800.0),
 }
 _LENGTHS = {"assistant_name": (1, 40), "treatment": (0, 40)}
+# Fields that take one of a fixed set of values.
+_CHOICES = {"voice.effect": {"", "leve", "medio", "forte"}}
 # Fields whose default is None but that accept text.
 _TEXT_OR_NULL = {"audio.input_device", "audio.output_device", "llm.model"}
 # Free-form dictionaries (keys defined by the user or by plugins).
@@ -71,6 +74,8 @@ def _valid(key: str, value: Any, default: Any) -> bool:
     if ok and key in _LENGTHS:
         lo, hi = _LENGTHS[key]
         ok = lo <= len(value) <= hi
+    if ok and key in _CHOICES:
+        ok = value in _CHOICES[key]
     return ok
 
 

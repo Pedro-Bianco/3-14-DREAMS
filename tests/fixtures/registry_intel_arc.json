@@ -1,0 +1,8 @@
+[
+  {
+    "MatchingDeviceId": "PCI\\VEN_8086&DEV_E20B&SUBSYS_00000000",
+    "DriverDesc": "Intel(R) Arc(TM) B580 Graphics",
+    "DriverVersion": "32.0.101.9033",
+    "HardwareInformation.qwMemorySize": 12884901888
+  }
+]

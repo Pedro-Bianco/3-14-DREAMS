@@ -155,12 +155,14 @@ class Connections:
             self._failed(id_, name, server, "o servidor fechou")
 
     def _failed(self, id_: str, name: str, server: _Server, reason_text: str) -> None:
-        server.state, server.reason_text, server.client = "erro", reason_text, None
         log.warning(f"[MCP] {name}: {reason_text}")
-        self._changed(id_)
+        # The notice goes out BEFORE the state changes: whoever sees "erro" already finds it
+        # (the other order made a test that waits for the state fail now and then).
         self._notify(problems.problem(
             f"mcp_{id_}", f"A conexão {name} parou: {reason_text}.",
             [("TENTAR DE NOVO", f"mcp_restart:{id_}"), ("VER LOG", f"mcp_log:{id_}")]))
+        server.state, server.reason_text, server.client = "erro", reason_text, None
+        self._changed(id_)
 
     # ── chamar ───────────────────────────────────────────────────────────────
 

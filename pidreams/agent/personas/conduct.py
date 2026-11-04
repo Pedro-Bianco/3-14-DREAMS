@@ -13,7 +13,8 @@ from pidreams.core.text import today_in_words
 log = logging.getLogger(__name__)
 
 _FOLDER = Path(__file__).resolve().parent
-DEFAULT_PERSONA = "jarvis"
+DEFAULT_PERSONA = "espirituoso"
+_RENAMED = {"jarvis": "espirituoso"}      # ids saved by older versions
 
 CONDUCT_RULES = """Regras ABSOLUTAS — nunca quebre estas regras:
 - Responda SEMPRE e EXCLUSIVAMENTE em português do Brasil, independentemente do idioma em que o usuário escrever.
@@ -46,6 +47,7 @@ def list_items() -> list[dict]:
 
 
 def load(persona_id: str) -> dict:
+    persona_id = _RENAMED.get(persona_id, persona_id)
     by_id = {p["id"]: p for p in list_items()}
     if persona_id not in by_id:
         log.warning("Persona '%s' does not exist; using '%s'", persona_id, DEFAULT_PERSONA)

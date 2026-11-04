@@ -28,6 +28,13 @@ class Config:
         return _recommendation().llm
 
     @property
+    def research_model(self) -> str:
+        return _recommendation().research_llm
+
+    # The research model leaves the card soon after the last step, so the chat model gets it back.
+    research_keep_alive = "2m"
+
+    @property
     def ollama_host(self) -> str:
         return SETTINGS.get("ollama.host")
 
@@ -92,37 +99,29 @@ class Config:
     mic_device_index = None
     chunk_size = 1024
     silence_threshold = 0.01
-    silence_duration_sec = 1.8
+    # Silence that ends the user's turn. 1.8 s added 1.8 s to every reply (latency log, 2026-11-04);
+    # 1.2 s still lets the user pause mid-sentence. Lower only after trying it in the app.
+    silence_duration_sec = 1.2
     max_recording_sec = 30.0
     # Interruption: threshold = N× the normal one; needs M consecutive chunks (~M*64ms)
     interrupt_threshold_factor = 2.5
     interrupt_min_chunks = 8  # ~512ms of sustained speech to interrupt
+    # While the assistant speaks, the microphone must be this many times above its expected echo.
+    interrupt_echo_margin = 2.0
 
     # ── Weather ──────────────────────────────────────────────────────────────
     @property
     def weather_city(self) -> str:
         return SETTINGS.get("weather.city")   # empty = no weather
 
-    # ── TTS (Piper — local, offline, PT-BR nativo) ───────────────────────────
-    # Available voices: pt_BR-cadu-medium | pt_BR-faber-medium | pt_BR-jeff-medium
+    # ── TTS (Kokoro — local, offline) ─────────────────────────────────────────
     @property
-    def piper_model(self) -> str:
+    def voice_model(self) -> str:
         return SETTINGS.get("voice.model")
 
     @property
-    def piper_models_dir(self) -> str:
-        """Voices downloaded by the user first; otherwise the voice shipped with the app."""
-        downloaded = paths.models_dir("piper")
-        if (downloaded / f"{self.piper_model}.onnx").is_file():
-            return str(downloaded)
-        return str(paths.install_dir() / "models" / "piper")
-
-    @property
-    def piper_length_scale(self) -> float:
+    def voice_length_scale(self) -> float:
         return SETTINGS.get("voice.length_scale")   # >1 = slower, <1 = faster
-
-    piper_noise_scale = 0.667  # pitch variation (0 = robotic, 1 = expressive)
-    piper_noise_w = 0.8        # phoneme duration variation
 
     # ── LTM — long-term memory (embedded Qdrant + FastEmbed) ─────────────────
     @property
@@ -151,7 +150,17 @@ class Config:
     # questions about the documents had a best piece of 1.18-2.01 and the right piece always in the
     # top 3; unrelated questions 0.67-1.37. No value separates both bases, so the gate only keeps out
     # most unrelated questions and the prompt tells the model to ignore pieces that do not fit.
-    kb_score_min = 1.25
+    # 2026-11-04: 1.35. In the app, small talk ("tudo bem?") scored 1.28 and 1.33 against a research
+    # report and the model started offering its topic; the lowest real question about the documents
+    # in the measurement scored 1.37.
+    kb_score_min = 1.35
+    # A weak best piece (below kb_strong_score) sends only the first kb_weak_top_k pieces. Measured
+    # 2026-11-04: small talk that passed the gate (1.30-1.41) carried 5 pieces of a research report,
+    # +1800 prompt tokens, and the first sentence took 5-9 s instead of 1.5 s on qwen3:8b. Questions
+    # about the documents with a weak best piece (1.37-1.57) had the right piece 1st in 4 of 5 (the
+    # 5th had it nowhere in the top 5); strong matches (1.6+) keep all 5.
+    kb_strong_score = 1.6
+    kb_weak_top_k = 2
     kb_chunk_size = 8      # sentences (sentence mode) or characters (other modes)
     # 1 sentence shared between pieces. With 2, the text was embedded 1.33x and a 100-page PDF took
     # 129 s; with 1, 105 s (2026-10-31), search and citation unchanged (12/13, codes 3/3, 13/13).

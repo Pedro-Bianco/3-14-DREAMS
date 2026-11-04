@@ -42,7 +42,7 @@ def logs_dir() -> Path:
 
 
 def models_dir(kind: str) -> Path:
-    """kind: piper, embeddings, whisper or cuda."""
+    """kind: pocket, kokoro, embeddings, whisper or cuda."""
     return user_data_dir() / "models" / kind
 
 
@@ -56,5 +56,5 @@ def plugin_data_dir(plugin_id: str) -> Path:
 
 
 def ensure_dirs() -> None:
-    for folder in (qdrant_dir(), logs_dir(), *(models_dir(k) for k in ("piper", "embeddings", "whisper", "cuda"))):
+    for folder in (qdrant_dir(), logs_dir(), *(models_dir(k) for k in ("pocket", "kokoro", "embeddings", "whisper", "cuda"))):
         folder.mkdir(parents=True, exist_ok=True)

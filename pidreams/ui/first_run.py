@@ -36,7 +36,7 @@ class FirstRunWizard:
 
         self._name = tk.StringVar(value=settings.get("assistant_name"))
         self._treatment = tk.StringVar(value=settings.get("treatment"))
-        self._persona = tk.StringVar(value=settings.get("persona_id"))
+        self._persona = tk.StringVar(value=conduct.load(settings.get("persona_id"))["id"])
         self._city = tk.StringVar(value=settings.get("weather.city"))
         self._voice = tk.StringVar(value=settings.get("voice.model"))
         default = "Padrão do Windows"
@@ -137,9 +137,8 @@ class FirstRunWizard:
         self._label("Deixe em branco para não mostrar o clima.", dim=True)
 
     def _step_voice(self):
-        names = list(voices.list_items()) or [self._voice.get()]
-        if self._voice.get() not in names:
-            self._voice.set(names[0])
+        names = voices.choices()
+        self._voice.set(voices.resolve(self._voice.get()))
         self._label("Voz do assistente:")
         self._items(self._voice, names)
         theme.button(self._body, "Ouvir prévia", self._preview).pack(anchor="w", pady=theme.px(8))
@@ -186,20 +185,16 @@ class FirstRunWizard:
             log.warning("Test sound failed: %s", e)
 
     def _preview(self):
-        file = voices.list_items().get(self._voice.get())
-        if file is None:
-            return
+        name = self._voice.get()
         text = conduct.sample_phrase(conduct.load(self._persona.get()),
                                          self._treatment.get().strip())
         output = devices.index(self._outputs.get(self._output.get()), "output")
 
         def speak():
             try:
-                from piper import PiperVoice
+                from pidreams.audio import tts
 
-                voice = PiperVoice.load(str(file), use_cuda=False)
-                audio = np.concatenate([c.audio_float_array for c in voice.synthesize(text)])
-                sd.play(audio, voice.config.sample_rate, device=output)
+                sd.play(tts.sample(name, text), tts.KOKORO_RATE, device=output)
             except Exception as e:
                 log.warning("Voice preview failed: %s", e)
 

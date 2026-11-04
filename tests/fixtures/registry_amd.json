@@ -1,0 +1,8 @@
+[
+  {
+    "MatchingDeviceId": "PCI\\VEN_1002&DEV_73FF&SUBSYS_00000000",
+    "DriverDesc": "AMD Radeon RX 6600",
+    "DriverVersion": "31.0.24027.1012",
+    "HardwareInformation.qwMemorySize": 8589934592
+  }
+]

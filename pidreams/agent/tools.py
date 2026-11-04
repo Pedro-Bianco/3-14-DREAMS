@@ -203,7 +203,7 @@ def web_search(query: str) -> str:
     except Exception:
         pass
     try:
-        parts += [f"• {n['source']} ({n['date']}) — {n['title']}" for n in monitor_sources.news_about(query, limit=5)]
+        parts += [f"• {n['source']} ({n['date']}) — {n['title']}" for n in monitor_sources.news_about(query, limit=5, gdelt=False)]
     except Exception:
         pass
     if parts:

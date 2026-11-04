@@ -1,6 +1,6 @@
 ; PI dreams installer — Inno Setup 6. Build it with installer\build.ps1.
 
-#define AppVersion "0.8.0"
+#define AppVersion "0.9.0"
 ; Ollama older than this gets updated. Set by measurement
 ; (first version with Vulkan on by default).
 #define MinOllama "0.40.6"
@@ -36,9 +36,7 @@ Name: "desktopicon"; Description: "Criar atalho na Área de Trabalho"; Flags: un
 
 [Files]
 Source: "..\dist\PIDreams\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\models\piper\pt_BR-faber-medium.onnx"; DestDir: "{app}\models\piper"; Flags: ignoreversion
-Source: "..\models\piper\pt_BR-faber-medium.onnx.json"; DestDir: "{app}\models\piper"; Flags: ignoreversion
-; Licenses: the installer bundles Piper (GPL-3.0) — see THIRD_PARTY_NOTICES.md
+; Licenses: the installer bundles eSpeak NG and phonemizer (GPL-3.0) — see THIRD_PARTY_NOTICES.md
 Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSES\*"; DestDir: "{app}\LICENSES"; Flags: ignoreversion

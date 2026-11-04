@@ -1,14 +1,15 @@
 # Virtual environment
 .venv/
 
-# Models (default voice in models/piper, copied by the installer; the rest lives in %LOCALAPPDATA%)
+# Models (downloaded into %LOCALAPPDATA% at install time)
 models/
 *.onnx
 *.onnx.json
 *.pt
 
-# Logs
+# Logs (the test fixtures are sample logs, not real ones)
 *.log
+!tests/fixtures/*.log
 
 # Python
 __pycache__/
@@ -28,6 +29,7 @@ desktop.ini
 
 # Personal data and credentials (LTM/KB memory)
 data/
+!tests/unit/data/
 
 
 # Build output and development environments

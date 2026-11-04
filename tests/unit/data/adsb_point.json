@@ -1,0 +1,10 @@
+{"ac": [
+  {"hex": "e4a001", "flight": "EXM1001 ", "r": "PR-XEA", "t": "A320", "alt_baro": 35000, "gs": 480.0, "track": 90.0, "lat": -23.50, "lon": -46.60, "seen_pos": 1.0, "seen": 0.5},
+  {"hex": "e4a002", "flight": "EXM2002 ", "r": "PR-XEB", "t": "B738", "alt_baro": 12000, "gs": 300.0, "track": 0.0, "lat": -23.20, "lon": -46.90, "seen_pos": 4.0, "seen": 1.0},
+  {"hex": "e4a003", "r": "PP-XEC", "t": "C172", "alt_baro": 4500, "gs": 110.0, "track": 225.0, "lat": -23.70, "lon": -46.40, "seen_pos": 2.0, "seen": 2.0},
+  {"hex": "e4a004", "flight": "EXM4004 ", "t": "E195", "alt_baro": "ground", "gs": 12.0, "track": 180.0, "lat": -23.43, "lon": -46.47, "seen_pos": 1.0, "seen": 1.0},
+  {"hex": "e4a005", "flight": "EXM5005 ", "t": "A21N", "alt_baro": 30000, "gs": 450.0, "track": 45.0, "seen": 3.0},
+  {"hex": "e4a006", "flight": "EXM6006 ", "t": "AT76", "alt_baro": 9000, "gs": 250.0, "track": 300.0, "lat": -22.90, "lon": -47.10, "seen_pos": 75.0, "seen": 70.0},
+  {"hex": "e4a007", "flight": "EXM7007 ", "alt_baro": 20000, "lat": -24.00, "lon": -46.00, "seen_pos": 3.0, "seen": 3.0}
+],
+"msg": "No error", "now": 1793730505501, "total": 7, "ctime": 1793730505501, "ptime": 2}

@@ -5,7 +5,7 @@
 <p align="center"><img src="docs/orb.gif" alt="A orbe do PI dreams ouvindo, pensando e falando" width="300"></p>
 
 <p align="center">
-  <b>Assistente pessoal de voz no estilo JARVIS, local e gratuito, para Windows.</b><br>
+  <b>Assistente pessoal de voz no estilo dos assistentes de ficção científica, local e gratuito, para Windows.</b><br>
   Conversa em português do Brasil, enxerga pela câmera quando você pede e lembra do que você
   contou. A IA roda no seu computador: sua voz, sua imagem e suas conversas não vão para a nuvem.
 </p>
@@ -14,6 +14,7 @@
   <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4" alt="Windows 10 e 11">
   <img src="https://img.shields.io/badge/IA-100%25%20local-2ea44f" alt="IA 100% local">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licen%C3%A7a-MIT-blue" alt="Licença MIT"></a>
+  <a href="https://github.com/Pedro-Bianco/3-14-DREAMS/actions/workflows/tests.yml"><img src="https://github.com/Pedro-Bianco/3-14-DREAMS/actions/workflows/tests.yml/badge.svg" alt="Testes"></a>
 </p>
 
 <p align="center">
@@ -22,10 +23,12 @@
 
 ## O que ele faz
 
-- **Conversa por voz e por texto**, em português, com interrupção falando por cima.
+- **Conversa por voz e por texto**, em português, com interrupção falando por cima, seis vozes
+  para escolher e um efeito opcional de voz de assistente. A resposta sai
+  [em streaming](#do-fim-da-sua-fala-à-resposta): ele começa a falar a primeira frase enquanto escreve o resto.
 - **Quatro [aparências](#aparências)**, escolhidas em Configurações → Geral e trocadas na hora: o
   rosto 3D em holograma, que segue o cursor com o olhar e mexe a boca com a fala, um núcleo de
-  energia (estilo JARVIS), um cérebro digital 3D em holograma ou uma orbe. Todas mostram se ele está
+  energia (estilo ficção científica), um cérebro digital 3D em holograma ou uma orbe. Todas mostram se ele está
   ouvindo, pensando ou falando e reagem ao volume da voz, sem usar a placa de vídeo.
 - **Janela que se adapta** do notebook ao monitor ultrawide: a aparência cresce com o espaço,
   a frase falada aparece como legenda e, em telas largas, cartões mostram o clima, a agenda de
@@ -54,7 +57,7 @@
 - **Controle do PC**: volume, mudo e música (pausar, próxima, anterior), janelas abertas
   (listar, trazer para frente, minimizar, maximizar, fechar), brilho da tela, bloquear, desligar e
   reiniciar. Fechar, bloquear, desligar e reiniciar só acontecem depois do seu "sim".
-- **Três personalidades**: JARVIS espirituoso, amigável e direto, ou formal.
+- **Três personalidades**: espirituosa, amigável e direta, ou formal.
 - **Resumo ao abrir**: uma vez por dia, ao abrir, diz a data, o clima, os compromissos de hoje,
   os e-mails não lidos e os lembretes (Configurações → Geral escolhe as partes).
 - **Lembretes**: "me lembra de pagar a conta na sexta", "quais lembretes eu tenho?", "já paguei".
@@ -82,7 +85,7 @@ em Configurações → Geral. Cada uma mostra os mesmos estados: ociosa, ouvindo
 | Aparência | Como é |
 |---|---|
 | **Rosto** | Holograma 3D de pontos e linhas, feito sobre a geometria aberta de rosto do MediaPipe (Apache-2.0). Vira a cabeça e os olhos para o cursor do mouse, pisca e mexe a boca e o queixo a cada sílaba da fala |
-| **Núcleo de energia** | Anel de energia azul com arcos girando, no estilo JARVIS, que pulsa com a voz |
+| **Núcleo de energia** | Anel de energia azul com arcos girando, no estilo ficção científica, que pulsa com a voz |
 | **Cérebro digital** | Holograma 3D com dois hemisférios, sulcos, cerebelo e tronco cerebral, gerado por código, que balança devagar sozinho. Pensando, pulsos de luz correm pelas conexões; falando, ondas de luz saem do centro com a voz |
 | **Orbe** | Esfera de luz minimalista com uma onda em volta que segue o volume real da voz |
 
@@ -187,7 +190,7 @@ PI só consulta com a camada ligada e uma região na tela, e mostra um aviso se 
 
 | Dado | Fonte (gratuita, sem conta) |
 |---|---|
-| Notícias | Feeds publicados pelos próprios veículos: Agência Brasil, BBC News Brasil, DW Brasil, ONU News e RTP; [GDELT](https://www.gdeltproject.org) como reserva |
+| Notícias | Feeds publicados pelos próprios veículos: Agência Brasil, BBC News Brasil, DW Brasil, ONU News e RTP |
 | Clima e nomes de lugares | [Open-Meteo](https://open-meteo.com) |
 | Terremotos | [USGS](https://earthquake.usgs.gov) |
 | Voos | [adsb.lol](https://adsb.lol) (dados abertos, ODbL) |
@@ -208,7 +211,8 @@ próprio pesquisa um tema a fundo. Peça, por exemplo, "pesquisa a fundo sobre b
 2. divide o tema em 3 a 5 perguntas;
 3. busca na Wikipédia (português e inglês) e nas notícias;
 4. lê até 12 fontes e anota, de cada uma, só o que responde às perguntas;
-5. escreve um relatório com seções, conclusão e citações numeradas [1], [2]… das fontes que leu;
+5. escreve um relatório com seções, conclusão e citações numeradas [1], [2]… das fontes que leu (com o
+   modelo mais forte da pesquisa, se você o baixou em Configurações → Hardware);
 6. fala um resumo e guarda o relatório na **Base**, com o tema e a data no nome.
 
 <table>
@@ -256,7 +260,7 @@ temas bem específicos podem render menos fontes.
 | Memória, base de documentos e lembretes | Navegador, nos sites que você pedir |
 | Suas preferências e senhas (cifradas) | Downloads de modelos e do Node, uma vez |
 | Os relatórios da Pesquisa profunda (na Base) | Pesquisa profunda, quando você pede: o tema vai para a Wikipédia e, se os feeds de notícias não tiverem nada, para o GDELT |
-| O globo e o cálculo da posição dos satélites | Monitoramento, quando aberto: os lugares que você pergunta ou clica vão para as fontes de clima e voos (e para o GDELT, se os feeds não tiverem notícias de lá); os feeds de notícias, as órbitas, os terremotos e a lista de rádios são baixados; a rádio tocando conecta direto na emissora |
+| O globo e o cálculo da posição dos satélites | Monitoramento, quando aberto: os lugares que você pergunta ou clica vão para as fontes de clima e voos; os feeds de notícias, as órbitas, os terremotos e a lista de rádios são baixados; a rádio tocando conecta direto na emissora |
 
 O PI dreams não tem conta, não tem assinatura e não envia telemetria.
 
@@ -312,12 +316,64 @@ Os modelos são baixados durante a instalação, cada um sob a licença do seu a
 | Seu PC | Modelo de conversa |
 |---|---|
 | Sem placa de vídeo dedicada ou com menos de 6 GB | Qwen3 4B Instruct |
-| Placa de vídeo com 6 a 12 GB | Qwen3 8B |
-| Placa de vídeo com 12 GB ou mais | Qwen 2.5 14B |
+| Placa de vídeo com 6 a 16 GB | Qwen3 8B |
+| Placa de vídeo com 16 GB ou mais | Qwen 2.5 14B |
 
 Além dele: o Whisper (reconhecimento de voz), o `multilingual-e5-large` (memória e Base) e, ao
-ligar a câmera pela primeira vez, o Qwen3-VL 2B (visão). Todos os modelos de conversa e de visão são Apache-2.0. A voz em português vem da coleção
-[Piper](https://github.com/rhasspy/piper).
+ligar a câmera pela primeira vez, o Qwen3-VL 2B (visão). Todos os modelos de conversa e de visão são Apache-2.0.
+
+A voz padrão, um barítono formal, roda no [Pocket TTS](https://github.com/kyutai-labs/pocket-tts) da Kyutai
+(pesos CC-BY-4.0, ~210 MB). Ela foi criada para o PI dreams a partir de uma descrição em texto, com o
+[VoxCPM2](https://huggingface.co/openbmb/VoxCPM2), sem gravar a voz de ninguém. Roda sem placa de vídeo e em
+streaming: o primeiro som sai cerca de 0,2 s depois que a frase começa a ser gerada, 3,8 vezes mais rápido
+que o tempo de ouvi-la.
+
+Em Configurações → Áudio e voz também dá para escolher uma das vozes do [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M)
+(Alex, Santa, Dora, Onyx ou a mistura Alex + Santa; Apache-2.0, ~340 MB, baixadas na primeira vez que são
+escolhidas) e um efeito opcional de assistente (leve, médio ou forte).
+
+A Pesquisa profunda pode escrever o relatório com um modelo mais forte, o Qwen 2.5 14B (~9 GB, opcional,
+em Configurações → Hardware). Ele é mais lento, mas a pesquisa roda em segundo plano; sem ele, ela usa o
+modelo de conversa.
+
+### Do fim da sua fala à resposta
+
+O PI dreams não espera a resposta inteira ficar pronta para começar a falar:
+
+1. **Fim da fala**: 1,2 s de silêncio encerram a sua vez.
+2. **Transcrição**: o Whisper transcreve a frase inteira de uma vez, no processador.
+3. **Memória e Base**: as lembranças e os documentos relacionados são buscados.
+4. **Modelo de conversa em streaming**: a resposta chega do Ollama pedaço por pedaço, e cada frase vai
+   para a voz assim que termina, enquanto o modelo continua escrevendo as próximas.
+5. **Voz em streaming**: o áudio de cada frase começa a tocar enquanto ela ainda está sendo gerada, e a
+   próxima é preparada enquanto a anterior toca, num fluxo contínuo, sem pausa entre elas. Dá para
+   interromper falando por cima: o PI dreams separa a sua voz do eco da própria voz nas caixas de som.
+
+O app registra no log o tempo de cada etapa, a cada fala. Medido em conversas reais com o Qwen3 8B numa
+placa de vídeo de 12 GB (Intel Arc B580) e a voz padrão:
+
+| Etapa | Tempo medido |
+|---|---|
+| Silêncio que encerra a sua vez | 1,2 s |
+| Transcrição (Whisper small, processador) | 1,2 a 1,6 s |
+| Memória e Base de documentos | 0,1 a 0,3 s |
+| Primeira frase do modelo de conversa | 0,5 a 0,8 s em conversa; 2 a 3 s quando usa uma ferramenta (notícias, voos, busca) |
+| Voz até começar a tocar | 0,11 a 0,20 s |
+| **Total, do fim do silêncio até ouvir a resposta** | **2,0 a 4,3 s** |
+
+Antes dessas otimizações, o mesmo PC levava de 8 a 12 s. O que mais pesou:
+
+| Mudança | Antes | Depois |
+|---|---|---|
+| Modelo de conversa numa placa de 12 GB | Qwen 2.5 14B transbordava para a memória do sistema: 2,6 tokens/s | Qwen3 8B inteiro na placa: 44 a 58 tokens/s |
+| Resposta | esperava o texto inteiro | streaming: fala a 1ª frase enquanto escreve o resto |
+| Trechos da Base em conversa casual | 5 trechos (+1.800 tokens), 1ª frase em 5 a 9 s | 2 trechos quando o casamento é fraco |
+| Silêncio que encerra a vez | 1,8 s | 1,2 s |
+| Transcrição | 4 núcleos: 1,56 s por frase | um por núcleo físico: ~1,35 s |
+| Voz até tocar | 0,4 a 1,8 s (frase inteira gerada antes) | 0,11 a 0,20 s (streaming) |
+
+Velocidade das vozes no processador: a padrão (Pocket TTS) gera a fala 3,8 vezes mais rápido que o
+tempo de ouvi-la; as Kokoro, 5 vezes, mas só tocam depois de gerar a frase inteira.
 
 ## Para desenvolvedores
 
@@ -328,7 +384,14 @@ Microsoft Store: a sandbox dele bloqueia a câmera) e o [Ollama](https://ollama.
 python -m venv .venv-dev
 .venv-dev\Scripts\pip install -r requirements\build.txt
 .venv-dev\Scripts\python -m pidreams          # abre o app
+.venv-dev\Scripts\python -m pytest -q        # testes
 ```
+
+- **Testes**: `tests/unit` e `tests/smoke` rodam sem rede, sem placa de vídeo e sem os modelos (fontes,
+  modelo de conversa e som são falsos; os poucos que precisam dos modelos baixados se pulam sozinhos) e
+  rodam a cada envio no GitHub Actions. Um deles procura dados pessoais e segredos em todos os arquivos
+  versionados. `tests/eval` tem as avaliações com os modelos e as fontes reais (escolha de ferramenta,
+  memória, Monitoramento, Pesquisa profunda), rodadas à mão: `python -m tests.eval.<nome>`.
 
 - **Estrutura**: `pidreams/core` (caminhos, configurações, log, segredos), `agent` (conversa,
   ferramentas, personas, avisos de problema), `audio`, `stt`, `memory` (memória, Base, mapa),
@@ -343,7 +406,8 @@ python -m venv .venv-dev
 O PI dreams só existe graças a estes projetos abertos:
 [Ollama](https://ollama.com) e os modelos [Qwen](https://github.com/QwenLM) (conversa e visão),
 [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (reconhecimento de voz),
-[Piper](https://github.com/rhasspy/piper) (voz),
+[Pocket TTS](https://github.com/kyutai-labs/pocket-tts) e [Kokoro](https://github.com/thewh1teagle/kokoro-onnx) (voz),
+[VoxCPM2](https://github.com/OpenBMB/VoxCPM) (criação da voz padrão),
 [Qdrant](https://qdrant.tech) e [FastEmbed](https://github.com/qdrant/fastembed) (memória),
 [pypdf](https://github.com/py-pdf/pypdf) (leitura de PDF),
 [sgp4](https://github.com/brandon-rhodes/python-sgp4) e [miniaudio](https://github.com/irmen/pyminiaudio) (Monitoramento),
@@ -351,10 +415,10 @@ O PI dreams só existe graças a estes projetos abertos:
 [OpenCV](https://opencv.org) (câmera) e
 [LangChain Text Splitters](https://github.com/langchain-ai/langchain) (divisão dos documentos).
 
-Dados do Monitoramento, consultados só em uso: [Natural Earth](https://www.naturalearthdata.com) (contornos, domínio público), [CelesTrak](https://celestrak.org), [USGS](https://earthquake.usgs.gov), [Open-Meteo](https://open-meteo.com) (com nomes de lugares do [GeoNames](https://www.geonames.org)), [adsb.lol](https://adsb.lol) (ODbL), [Radio Browser](https://www.radio-browser.info), feeds de notícias da [Agência Brasil](https://agenciabrasil.ebc.com.br), [BBC News Brasil](https://www.bbc.com/portuguese), [DW Brasil](https://www.dw.com/pt-br), [ONU News](https://news.un.org/pt) e [RTP](https://www.rtp.pt/noticias), e [GDELT](https://www.gdeltproject.org).
+Dados do Monitoramento, consultados só em uso: [Natural Earth](https://www.naturalearthdata.com) (contornos, domínio público), [CelesTrak](https://celestrak.org), [USGS](https://earthquake.usgs.gov), [Open-Meteo](https://open-meteo.com) (com nomes de lugares do [GeoNames](https://www.geonames.org)), [adsb.lol](https://adsb.lol) (ODbL), [Radio Browser](https://www.radio-browser.info), feeds de notícias da [Agência Brasil](https://agenciabrasil.ebc.com.br), [BBC News Brasil](https://www.bbc.com/portuguese), [DW Brasil](https://www.dw.com/pt-br), [ONU News](https://news.un.org/pt) e [RTP](https://www.rtp.pt/noticias). Na Pesquisa profunda, também o [GDELT](https://www.gdeltproject.org).
 
 ## Licença
 
-O código do PI dreams é [MIT](LICENSE). O instalador para Windows embute o Piper (síntese de
-voz, GPL-3.0), por isso é distribuído sob a [GPL-3.0](LICENSES/GPL-3.0.txt). Detalhes de cada
+O código do PI dreams é [MIT](LICENSE). O instalador para Windows embute o eSpeak NG e o phonemizer
+(pronúncia das vozes, GPL-3.0), por isso é distribuído sob a [GPL-3.0](LICENSES/GPL-3.0.txt). Detalhes de cada
 componente em [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

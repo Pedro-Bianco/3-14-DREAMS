@@ -1,4 +1,4 @@
-"""Energy core (JARVIS style): a core of light, segmented rings spinning in opposite
+"""Energy core (sci-fi assistant style): a core of light, segmented rings spinning in opposite
 directions and a crown of strokes that follows the voice volume.
 
 Only geometric shapes drawn here (no third-party art or logo) and vector canvas items,

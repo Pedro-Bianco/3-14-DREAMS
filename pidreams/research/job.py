@@ -313,7 +313,8 @@ class ResearchJob:
         self._announce("Escrevendo o relatório.")
         notes = "\n\n".join(f"[{s['n']}] {s['title']}:\n{s['note']}" for s in useful)
         questions = "\n".join(f"- {q['question']}" for q in self.questions)
-        body = self._chat(WRITE_PROMPT.format(topic=self.topic, questions=questions, notes=notes), 1400, self.cancel)
+        body = self._chat(WRITE_PROMPT.format(topic=self.topic, questions=questions, notes=notes), 1400, self.cancel,
+                          strong=True)
         body = clean_citations(body.strip(), {s["n"] for s in useful})
         when = datetime.now().strftime("%d/%m/%Y %H:%M")
         refs = "\n".join(f"[{s['n']}] {s['title']} — {s['url']}" for s in useful)

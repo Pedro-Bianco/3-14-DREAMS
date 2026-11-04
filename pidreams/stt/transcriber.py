@@ -1,4 +1,5 @@
 import logging
+import os
 import unicodedata
 
 import numpy as np
@@ -72,6 +73,9 @@ class Transcriber:
             CONFIG.whisper_model_size,
             device=device,
             compute_type=compute,
+            # One thread per physical core (~half the logical ones). faster-whisper's default of 4 took
+            # 1.56 s per sentence on an 8-core CPU, 6-12 threads 1.32-1.37 s (2026-11-04).
+            cpu_threads=max(4, (os.cpu_count() or 8) // 2),
             download_root=str(paths.models_dir("whisper")),
         )
         log.info("[STT] Model loaded.")

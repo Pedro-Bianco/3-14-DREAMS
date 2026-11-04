@@ -17,7 +17,7 @@ DEFAULT = "rosto"
 # id → (name in the settings, class, fallback if it fails)
 CATALOG = {
     "rosto": ("Rosto", FaceCanvas, "orbe"),
-    "nucleo": ("Núcleo de energia (estilo JARVIS)", CoreCanvas, "rosto"),
+    "nucleo": ("Núcleo de energia (estilo ficção científica)", CoreCanvas, "rosto"),
     "cerebro": ("Cérebro digital", BrainCanvas, "rosto"),
     "orbe": ("Orbe", OrbCanvas, "rosto"),
 }

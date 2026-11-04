@@ -1,0 +1,8 @@
+[
+  {
+    "MatchingDeviceId": "PCI\\VEN_10DE&DEV_2504&SUBSYS_00000000",
+    "DriverDesc": "NVIDIA GeForce RTX 3060",
+    "DriverVersion": "32.0.15.6094",
+    "HardwareInformation.qwMemorySize": 12884901888
+  }
+]

@@ -3,7 +3,7 @@ raises SourceError with a short Portuguese sentence for the user; one source fai
 takes the others down. Every source here allows this use (terms and robots.txt checked 2026-11-03).
 
 - news: the feeds the outlets publish (Agência Brasil, BBC News Brasil, DW, ONU News, RTP: ~200
-  recent items in 1.3 s), filtered by the place; GDELT as the fallback, one request every 5 s.
+  recent items in 1.3 s), filtered by the place; GDELT as the deep research's fallback, one request every 5 s.
 - places and weather: Open-Meteo. Earthquakes: USGS feed. Flights: adsb.lol (open data).
 - radios: Radio Browser, MP3 only (65% of the stations with coordinates; see radio.py); its servers
   are looked up in DNS, as its rules ask.
@@ -167,14 +167,15 @@ def _gdelt(terms: str, timespan: str) -> list[dict]:
     return parse_gdelt(_get(url, 20))
 
 
-def news_about(terms: str, limit: int = 10, timespan: str = "24h") -> list[dict]:
-    """Recent headlines naming `terms`: the outlets' feeds first, GDELT when they have none."""
+def news_about(terms: str, limit: int = 10, timespan: str = "24h", gdelt: bool = True) -> list[dict]:
+    """Recent headlines naming `terms`: the outlets' feeds first, GDELT when they have none (unless
+    gdelt=False: a spoken answer cannot wait for its 5 s gap and frequent 429s)."""
     try:
         items, _age = _cached("news_feeds", FEEDS_MAX_AGE, _fetch_feeds, "as notícias")
     except SourceError:
         items = []
     found = matching(items, terms)[:limit]
-    if found:
+    if found or not gdelt:
         return found
     try:
         return _gdelt(terms, timespan)
@@ -186,8 +187,9 @@ def news_about(terms: str, limit: int = 10, timespan: str = "24h") -> list[dict]
 
 
 def news(place_name: str) -> list[dict]:
-    """Recent headlines about a place: [{title, source, date, link, ...}]."""
-    return news_about(place_name)
+    """Recent headlines about a place: [{title, source, date, link, ...}]. The outlets' feeds only:
+    the monitor answers by voice, and the GDELT fallback once held a reply for 22 s (2026-11-04)."""
+    return news_about(place_name, gdelt=False)
 
 
 # ── weather ──

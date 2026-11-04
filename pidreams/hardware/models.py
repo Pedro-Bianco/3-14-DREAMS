@@ -155,12 +155,99 @@ def download_embeddings(progress: Progress, cancel: threading.Event) -> None:
                        progress, cancel)
 
 
+# ── Voice files: fixed files with known sizes, downloaded straight from their release ──
+
+def _files_present(kind: str, files: dict[str, tuple[str, int]]) -> bool:
+    folder = paths.models_dir(kind)
+    return all((folder / name).is_file() and (folder / name).stat().st_size == size
+               for name, (_url, size) in files.items())
+
+
+def _download_files(label: str, kind: str, files: dict[str, tuple[str, int]],
+                    progress: Progress, cancel: threading.Event) -> None:
+    """files: {local name: (url, size in bytes)}. A half file never sits under the real name."""
+    import urllib.request
+
+    from pidreams import USER_AGENT
+
+    folder = paths.models_dir(kind)
+    if _files_present(kind, files):
+        progress(100, f"{label} já instaladas")
+        return
+    total = sum(size for _url, size in files.values())
+    check_space(folder, total)
+    done = 0
+    for name, (url, size) in files.items():
+        target = folder / name
+        if target.is_file() and target.stat().st_size == size:
+            done += size
+            continue
+        part = target.with_suffix(target.suffix + ".part")
+        try:
+            request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(request, timeout=30) as response, open(part, "wb") as out:
+                while chunk := response.read(1024 * 1024):
+                    if cancel.is_set():
+                        raise Cancelled()
+                    out.write(chunk)
+                    done += len(chunk)
+                    progress(min(99.0, 100 * done / total), f"{label}: {done / 1024**2:.0f} de {total / 1024**2:.0f} MB")
+        except Cancelled:
+            part.unlink(missing_ok=True)
+            raise
+        except Exception as e:
+            part.unlink(missing_ok=True)
+            raise DownloadFailed(f"Não foi possível baixar as {label.lower()} ({name}): {e}") from e
+        if part.stat().st_size != size:
+            part.unlink(missing_ok=True)
+            raise DownloadFailed(f"O arquivo {name} das {label.lower()} chegou incompleto. Tente de novo.")
+        part.replace(target)
+    progress(100, f"{label} prontas")
+
+
+# Kokoro voices (GitHub release of kokoro-onnx; Kokoro-82M weights, Apache-2.0). Sizes of the release
+# files (2026-11-04); the full-precision model is the one chosen by ear. Optional voices: downloaded
+# when one is chosen in the settings.
+_KOKORO_URL = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/"
+_KOKORO_FILES = {name: (_KOKORO_URL + name, size) for name, size in
+                 {"kokoro-v1.0.onnx": 325_505_369, "voices-v1.0.bin": 28_214_398}.items()}
+
+
+def kokoro_present() -> bool:
+    return _files_present("kokoro", _KOKORO_FILES)
+
+
+def download_kokoro(progress: Progress, cancel: threading.Event) -> None:
+    _download_files("Vozes Kokoro", "kokoro", _KOKORO_FILES, progress, cancel)
+
+
+# Pocket TTS, Portuguese (Kyutai, CC-BY-4.0): the public weights, without voice cloning, pinned to
+# the revisions pocket-tts 4.0.1 names. The default voice is a state file shipped with the app.
+_POCKET_REPO = "https://huggingface.co/kyutai/pocket-tts-without-voice-cloning/resolve/"
+POCKET_FILES = {
+    "model.safetensors": (_POCKET_REPO + "1e08e6a23401048648a9fdcfde2f89348215c2a7/languages/portuguese/model.safetensors",
+                          219_029_196),
+    "tokenizer.json": (_POCKET_REPO + "4e1e0a3e611c51c0b4ed8174fc10f32a54644303/languages/portuguese/tokenizer.json",
+                       247_014),
+}
+
+
+def pocket_present() -> bool:
+    return _files_present("pocket", POCKET_FILES)
+
+
+def download_pocket(progress: Progress, cancel: threading.Event) -> None:
+    _download_files("Vozes", "pocket", POCKET_FILES, progress, cancel)
+
+
 # ── Conjuntos ─────────────────────────────────────────────────────────────────
 
 def essentials() -> list[tuple[str, Callable[[Progress, threading.Event], None]]]:
-    """What the install downloads: chatting needs these three."""
+    """What the install downloads: chatting by voice needs these four. The deep research's stronger
+    model is optional (Configurações → Hardware)."""
     return [
         (f"Modelo de conversa ({CONFIG.ollama_model})", lambda p, c: download_ollama(CONFIG.ollama_model, p, c)),
         ("Reconhecimento de voz (Whisper)", download_whisper),
         ("Memória (embeddings)", download_embeddings),
+        ("Voz (~210 MB)", download_pocket),
     ]

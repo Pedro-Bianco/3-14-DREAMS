@@ -16,7 +16,7 @@ from pidreams.ui import theme
 from pidreams.ui.globe import GlobeView
 
 CREDITS = ("Dados: Natural Earth · CelesTrak · USGS · Open-Meteo.com · GeoNames · adsb.lol (ODbL) · Radio Browser · "
-           "Notícias: Agência Brasil · BBC News Brasil · DW · ONU News · RTP · GDELT (gdeltproject.org)")
+           "Notícias: Agência Brasil · BBC News Brasil · DW · ONU News · RTP")
 _FILTERS = {"Todos": None, **{label: {kind} for kind, label in sat_mod.TYPES.items()}}
 log = logging.getLogger(__name__)
 
@@ -159,7 +159,7 @@ class MonitorView(tk.Frame):
 
     def _planes_tick(self) -> None:
         """Once a second while the monitor is open: which region to show and whether to query it.
-        Nothing is queried with the layer off, the monitor closed or no region (FR-003)."""
+        Nothing is queried with the layer off, the monitor closed or no region."""
         self._planes_job = self.after(1000, self._planes_tick)
         if not self.globe.layers["planes"]:
             return

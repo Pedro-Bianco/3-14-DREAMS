@@ -70,19 +70,37 @@ SCHEMAS = [
         "parameters": {"type": "object", "properties": {}, "required": []}}},
 ]
 
-_STEPS = {"esclarecendo": "esperando as suas escolhas", "planejando": "planejando as perguntas", "buscando": "buscando fontes", "lendo": "lendo as fontes",
+_STEPS = {"esclarecendo": "esperando o usuário escolher as opções mostradas na tela (ainda não começou a buscar)", "planejando": "planejando as perguntas", "buscando": "buscando fontes", "lendo": "lendo as fontes",
           "escrevendo": "escrevendo o relatório", "guardando": "guardando o relatório", "pronta": "pronta",
           "cancelada": "cancelada", "falhou": "falhou"}
 
 
-def chat(prompt_text: str, max_tokens: int, cancel) -> str:
-    """One model call, streamed so a cancel stops it within a fraction of a second. Same options as
-    the agent (another num_ctx would make Ollama reload the model)."""
+def research_model(strong: bool) -> tuple[str, str]:
+    """(model, keep_alive): for strong calls, the stronger research model when it is installed;
+    otherwise the chat one."""
+    from pidreams.hardware import models
+
+    if not strong or CONFIG.research_model == CONFIG.ollama_model:
+        return CONFIG.ollama_model, CONFIG.ollama_keep_alive
+    try:
+        if models.ollama_model_present(CONFIG.research_model):
+            return CONFIG.research_model, CONFIG.research_keep_alive
+    except Exception as e:          # noqa: BLE001 — Ollama down: the call below says so
+        log.warning("[Research] could not list the models: %s", e)
+    log.info("[Research] %s not installed, using %s", CONFIG.research_model, CONFIG.ollama_model)
+    return CONFIG.ollama_model, CONFIG.ollama_keep_alive
+
+
+def chat(prompt_text: str, max_tokens: int, cancel, strong: bool = False) -> str:
+    """One model call, streamed so a cancel stops it within a fraction of a second. strong=True
+    (the report itself) uses the stronger research model; the other steps are short and stay on
+    the chat model: the 14b at 2.4 tok/s on every step made a research take ~25 min (2026-11-04)."""
     client = ollama.Client(host=CONFIG.ollama_host, timeout=CONFIG.ollama_timeout_s)
+    model, keep_alive = research_model(strong)
     parts = []
-    for chunk in client.chat(model=CONFIG.ollama_model, messages=[{"role": "user", "content": prompt_text}],
+    for chunk in client.chat(model=model, messages=[{"role": "user", "content": prompt_text}],
                              options={**CONFIG.ollama_options, "num_predict": max_tokens}, think=False,
-                             keep_alive=CONFIG.ollama_keep_alive, stream=True):
+                             keep_alive=keep_alive, stream=True):
         if cancel.is_set():
             raise Cancelled()
         parts.append(chunk.message.content or "")

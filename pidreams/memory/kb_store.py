@@ -155,7 +155,8 @@ class KBStore:
     def search_hits(self, query: str, query_vector: list[float] | None = None,
                     top_k: int | None = None, score_min: float | None = None) -> list[dict]:
         """Pieces by meaning + exact word, fused by DBSF. The minimum score is a gate on the BEST
-        piece (is the question about the documents at all?); when it opens, the top pieces all go.
+        piece (is the question about the documents at all?); when it opens, the top pieces go (only the
+        first ones when the best is weak).
         Cutting each piece by its own score dropped right answers ranked 2nd or 3rd: DBSF scores
         are relative to the candidates, so a fixed cut does not hold across bases (2026-10-31)."""
         if not self.available or not query.strip():
@@ -169,6 +170,8 @@ class KBStore:
                 prefetch=[Prefetch(query=vector, using="dense", limit=_PREFETCH),
                           Prefetch(query=terms.sparse(query), using="terms", limit=_PREFETCH)],
                 query=FusionQuery(fusion=Fusion.DBSF), limit=top_k, with_payload=True).points
+            if points and points[0].score < CONFIG.kb_strong_score:
+                points = points[:CONFIG.kb_weak_top_k]
             log.info("[KB] best %.3f (gate %.2f) → %s", points[0].score if points else 0, score_min,
                      [label(p.payload) for p in points] if points and points[0].score >= score_min else "nothing")
             if not points or points[0].score < score_min:

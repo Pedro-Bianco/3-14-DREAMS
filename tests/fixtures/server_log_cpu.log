@@ -1,0 +1,5 @@
+time=2026-10-16T14:28:34.713-03:00 level=INFO source=routes.go:1782 msg="server config" env="map[OLLAMA_VULKAN:false]"
+time=2026-10-16T14:28:58.797-03:00 level=INFO source=runner.go:106 msg="experimental Vulkan support disabled.  To enable, set OLLAMA_VULKAN=1"
+time=2026-10-16T14:28:58.798-03:00 level=INFO source=types.go:60 msg="inference compute" id=cpu library=cpu compute="" name=cpu description=cpu libdirs=ollama driver="" pci_id="" type="" total="31.9 GiB" available="12.1 GiB"
+time=2026-10-19T17:21:55.123-03:00 level=INFO source=routes.go:2439 msg="server config" env="map[OLLAMA_HOST:http://127.0.0.1:11434]"
+time=2026-10-19T17:21:56.575-03:00 level=INFO source=types.go:32 msg="inference compute" id=cpu library=cpu compute="" name=cpu description=cpu libdirs=ollama driver="" pci_id="" type="" total="31.9 GiB" available="20.0 GiB"

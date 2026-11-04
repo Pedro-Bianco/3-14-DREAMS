@@ -1,6 +1,8 @@
 import logging
 import asyncio
+import collections
 import queue
+import statistics
 import numpy as np
 import sounddevice as sd
 from pidreams.core.config import CONFIG
@@ -13,6 +15,9 @@ class AudioRecorder:
         self._queue: queue.Queue[np.ndarray] = queue.Queue()
         self._threshold: float = CONFIG.silence_threshold
         self._mic_device_ref = mic_device_ref if mic_device_ref is not None else [CONFIG.mic_device_index]
+        # Microphone level / playback level while the assistant speaks: how much of its own voice the
+        # microphone hears back from the speakers. Learned across turns.
+        self._echo_ratios: collections.deque[float] = collections.deque(maxlen=80)
 
     def _callback(self, indata: np.ndarray, frames: int, time, status):
         if status:
@@ -93,11 +98,25 @@ class AudioRecorder:
                     if silent_chunks >= silence_needed:
                         break
 
-        audio = np.concatenate(frames, axis=0).flatten()
-        return audio
+        if not frames:              # cancelled before any audio arrived (closing, switching mode)
+            return np.array([], dtype=np.float32)
+        return np.concatenate(frames, axis=0).flatten()
 
-    async def record_while_agent_speaks(self, interrupt_cb, cancel_check=None) -> np.ndarray:
+    def _echo_gain(self) -> float:
+        """90th percentile of the microphone/playback ratio: the loud parts of the echo, not the typical
+        one (with the median, "do avião podentes." still interrupted the news, 2026-11-04). 1.0 (the
+        echo as loud as the voice) until learned."""
+        if len(self._echo_ratios) < 8:
+            return 1.0
+        return statistics.quantiles(self._echo_ratios, n=10)[-1]
+
+    async def record_while_agent_speaks(self, interrupt_cb, cancel_check=None, playback_level=None) -> np.ndarray:
+        """playback_level() → level of the assistant's voice playing now. Speech only counts as an
+        interruption when the microphone is well above the echo expected from that level: on
+        2026-11-04 the speakers' echo reached the microphone louder than the user's own voice
+        (peaks 0.17-0.24 vs 0.07-0.14) and the assistant kept interrupting itself."""
         self._flush_queue()
+        recent_playback: collections.deque[float] = collections.deque(maxlen=5)   # ~320 ms: output latency + room tail
 
         interrupt_threshold = self._threshold * CONFIG.interrupt_threshold_factor
         min_chunks = CONFIG.interrupt_min_chunks
@@ -122,10 +141,20 @@ class AudioRecorder:
                 rms = float(np.sqrt(np.mean(chunk ** 2)))
 
                 if not interrupt_triggered:
-                    if rms > interrupt_threshold:
+                    loud = rms > interrupt_threshold
+                    if playback_level is not None:
+                        recent_playback.append(playback_level())
+                        playing = max(recent_playback)
+                        if playing > 0.005:
+                            loud = loud and rms > CONFIG.interrupt_echo_margin * self._echo_gain() * playing
+                            if not loud:
+                                self._echo_ratios.append(rms / playing)
+                    if loud:
                         consecutive_loud += 1
                         pre_buffer.append(chunk)
                         if consecutive_loud >= min_chunks:
+                            log.info("[VAD] interrupted: mic %.4f, playback %.4f, echo gain %.3f (%d samples)",
+                                     rms, max(recent_playback, default=0.0), self._echo_gain(), len(self._echo_ratios))
                             interrupt_triggered = True
                             interrupt_cb()
                             frames = list(pre_buffer)

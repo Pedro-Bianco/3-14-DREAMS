@@ -3,6 +3,7 @@ import json
 import logging
 import re
 import asyncio
+import threading
 from typing import AsyncGenerator
 import ollama
 from pidreams.agent.tools import active_tool_schemas, dispatch_tool
@@ -18,7 +19,9 @@ def system_prompt() -> str:
     return build_prompt(SETTINGS)
 
 
-_SENTENCE_RE = re.compile(r'(?<=[.!?])\s+|(?<=[.!?])$')
+# A line break also ends a sentence: a list of headlines has no full stops, and spoken as one
+# "sentence" it waited 9.4 s for the voice to synthesize the whole list (2026-11-04).
+_SENTENCE_RE = re.compile(r'(?<=[.!?])\s+|(?<=[.!?])$|\s*\n\s*')
 
 
 def _split_sentences(text: str) -> list[str]:
@@ -50,6 +53,25 @@ def _calls_in_text(text: str, visible: set[str]) -> list[tuple[str, dict]]:
                 pass
         calls.append((position, name, args))
     return [(name, args) for _, name, args in sorted(calls)]
+
+
+_SENTENCE_END_RE = re.compile(r"[.!?]+(?=\s)|\n")
+
+
+def _complete_sentences_end(text: str, start: int) -> int:
+    """Where the last finished sentence of text[start:] ends (a . ! or ? followed by a space, or a
+    line break), or start when none is finished yet. The last sentence of a reply has no space after it: it is
+    said when the reply ends."""
+    end = start
+    for match in _SENTENCE_END_RE.finditer(text, start):
+        end = match.end()
+    return end
+
+
+def _looks_like_code(text: str, visible: set[str]) -> bool:
+    """A reply that starts like code or names a tool is a call written as text: never spoken."""
+    stripped = text.lstrip()
+    return stripped[:1] in ("{", "[", "<", "`", "_") or any(name in text for name in visible)
 
 
 def _foreign_script(text: str) -> bool:
@@ -157,6 +179,42 @@ class LLMAgent:
             keep_alive=CONFIG.ollama_keep_alive,
         )
 
+    async def _stream_llm(self) -> AsyncGenerator:
+        """The reply as it is written, chunk by chunk, so the first sentence can be spoken while the
+        rest is still being generated (before, the whole reply came first: measured 2026-11-04, the
+        voice only started after the model finished). Read in a thread; closing the generator (the
+        user interrupted) stops reading the stream. A client that returns one whole response (the
+        tests' fakes) counts as a single chunk."""
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue = asyncio.Queue()
+        stop = threading.Event()
+
+        def read():
+            try:
+                response = self._client.chat(model=CONFIG.ollama_model, messages=self.history,
+                                              tools=self._tool_schemas(), options=CONFIG.ollama_options,
+                                              think=False, keep_alive=CONFIG.ollama_keep_alive, stream=True)
+                for chunk in ([response] if hasattr(response, "message") else response):
+                    if stop.is_set():
+                        break
+                    loop.call_soon_threadsafe(queue.put_nowait, ("chunk", chunk))
+                loop.call_soon_threadsafe(queue.put_nowait, ("end", None))
+            except Exception as e:          # noqa: BLE001 — raised again in the caller's task
+                loop.call_soon_threadsafe(queue.put_nowait, ("error", e))
+
+        threading.Thread(target=read, daemon=True, name="llm-stream").start()
+        try:
+            while True:
+                kind, value = await queue.get()
+                if kind == "chunk":
+                    yield value
+                elif kind == "end":
+                    return
+                else:
+                    raise value
+        finally:
+            stop.set()
+
     async def chat_streaming(
         self,
         user_text: str,
@@ -187,11 +245,35 @@ class LLMAgent:
                 # at "PROCESSANDO..." forever.
                 yield "Me perdi entre as ferramentas. Pode reformular?"
                 break
+            visible = {s["function"]["name"] for s in self._tool_schemas()}
+            content, calls, spoken = "", [], []
+            held = False               # code or another script showed up: decide at the end, speak nothing more
+            said_up_to = 0             # content[:said_up_to] was already yielded
             try:
-                msg = (await self._call_llm()).message
+                async for chunk in self._stream_llm():
+                    message = chunk.message
+                    calls += [(tc.function.name, tc.function.arguments) for tc in message.tool_calls or []]
+                    content += message.content or ""
+                    if held or calls:
+                        continue
+                    if _looks_like_code(content, visible):
+                        held = True
+                        continue
+                    end = _complete_sentences_end(content, said_up_to)
+                    for sentence in _split_sentences(content[said_up_to:end]):
+                        if _foreign_script(sentence):
+                            # Only from here on is decided at the end: the sentences already said
+                            # before it must not come back in the tail.
+                            held = True
+                            said_up_to = content.find(sentence, said_up_to)
+                            break
+                        spoken.append(sentence)
+                        yield sentence
+                    if not held:
+                        said_up_to = end
             except ollama.ResponseError as e:
                 # The same derailment as the Thai replies, cut by Ollama: "token repeat limit reached".
-                if "repeat" not in str(e) or retried_language:
+                if "repeat" not in str(e) or retried_language or spoken:
                     raise
                 log.warning(f"[Reply looped ({e}), retrying]")
                 retried_language = True
@@ -200,8 +282,18 @@ class LLMAgent:
                     msg = (await self._call_llm()).message
                 finally:
                     self.history.pop()
-            reply = (msg.content or "").strip()
-            calls = [(tc.function.name, tc.function.arguments) for tc in msg.tool_calls or []]
+                content = msg.content or ""
+                calls = [(tc.function.name, tc.function.arguments) for tc in msg.tool_calls or []]
+            reply = content.strip()
+            if spoken and not calls:
+                # Already speaking: the rest is said if it is still Portuguese, otherwise dropped.
+                rest = content[said_up_to:]
+                tail = [] if _foreign_script(rest) or _looks_like_code(rest, visible) else _split_sentences(rest)
+                for sentence in tail:
+                    yield sentence
+                self.history.append({"role": "assistant", "content": " ".join(spoken + tail)})
+                self._trim_history()
+                break
             if not calls and _foreign_script(reply) and not retried_language:
                 # Asked the same thing twice, the monitor's agent answered in Thai (app test,
                 # 2026-11-02); with an overflowing context the main one answered in Chinese.
@@ -216,7 +308,6 @@ class LLMAgent:
                 if not calls and _foreign_script(reply):
                     reply = "Desculpe, me confundi. Pode repetir o pedido?"
             if not calls:
-                visible = {s["function"]["name"] for s in self._tool_schemas()}
                 calls = _calls_in_text(reply, visible)
                 if calls:
                     log.info(f"[Call written as text: {reply[:120]!r}]")

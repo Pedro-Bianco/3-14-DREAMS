@@ -12,7 +12,7 @@ from pidreams import pc, reminders
 from pidreams.agent import problems, tools
 from pidreams.mcp.confirmation import Confirmer
 from pidreams.agent.memory_client import MemoryClient
-from pidreams.audio.tts import TTSEngine
+from pidreams.audio.tts import VOICE_LEVEL, TTSEngine
 from pidreams.core.config import CONFIG
 from pidreams.core.settings import SETTINGS
 from pidreams.memory.kb_store import label
@@ -75,6 +75,23 @@ class _Reflection:
         self._since_last = 0
 
 
+async def _log_latency(turn: dict[str, float], tts: TTSEngine) -> None:
+    """One log line per voice turn: how long each stage took, from the end of the silence wait to
+    the first sound. The silence wait itself is CONFIG.silence_duration_sec before 'heard'."""
+    for _ in range(200):                       # the first sentence may still be synthesizing
+        if tts.first_audio_at is not None:
+            break
+        await asyncio.sleep(0.05)
+    audio = tts.first_audio_at
+    stages = [("transcrição", turn["heard"], turn["stt"]), ("memória e Base", turn["stt"], turn["context"]),
+              ("1ª frase do modelo", turn["context"], turn["first_sentence"])]
+    if audio is not None:
+        stages.append(("voz até tocar", turn["first_sentence"], audio))
+    parts = " · ".join(f"{name} {end - start:.2f}s" for name, start, end in stages)
+    total = (audio or turn["first_sentence"]) - turn["heard"]
+    log.info(f"[Latency] silêncio {CONFIG.silence_duration_sec:.1f}s + {parts} = {total:.2f}s após o silêncio")
+
+
 async def _deliver(emit: Callable, tts: TTSEngine, mode: str, chunks: list[str]):
     emit("agent_start")
     for chunk in chunks:
@@ -123,6 +140,7 @@ async def _vad_watch(
     audio = await recorder.record_while_agent_speaks(
         interrupt_cb=interrupt_event.set,
         cancel_check=lambda: bool(stop_event and stop_event.is_set()) or confirming.is_set(),
+        playback_level=lambda: VOICE_LEVEL[0],
     )
     captured.append(audio)
 
@@ -250,9 +268,12 @@ async def run_agent(
     tools.configure_mcp(connections, Confirmer(_ask, _listen, _shutdown))
 
     emit("status", "🟢 Pronto — fale algo")
-    # Daily briefing instead of "Estou pronto": full once a day, then reminders only.
+    # Briefing instead of "Estou pronto": full once a day (or every time the app opens, if the user
+    # chose so), otherwise reminders only.
     today = datetime.date.today()
-    full_briefing = (SETTINGS.get("resumo") or {}).get("ligado", True) and reminders.last_briefing() != today.isoformat()
+    briefing_settings = SETTINGS.get("resumo") or {}
+    full_briefing = briefing_settings.get("ligado", True) and (
+        briefing_settings.get("toda_vez", False) or reminders.last_briefing() != today.isoformat())
     if full_briefing:
         await asyncio.sleep(2)                 # gives saved connections time to reconnect
     initial_text = await asyncio.to_thread(_briefing_text, connections, full_briefing)
@@ -293,6 +314,7 @@ async def run_agent(
             except stdlib_queue.Empty:
                 pass
 
+        turn: dict[str, float] = {}       # timestamps of this voice turn, for the latency log
         if pending_text:
             text = pending_text
             pending_text = None
@@ -318,7 +340,9 @@ async def run_agent(
                 break
             if mode() != "voice" or muted():
                 continue
+            turn["heard"] = time.perf_counter()            # end of speech + the silence wait
             text = transcriber.transcribe(audio)
+            turn["stt"] = time.perf_counter()
             if not text:
                 continue
         else:
@@ -447,16 +471,24 @@ async def run_agent(
 
         reply_parts: list[str] = []
         history_before = len(agent.history)
+        if turn:
+            turn["context"] = time.perf_counter()
+        tts.first_audio_at = None
         try:
             emit("agent_start")
             async for sentence in agent.chat_streaming(text, recall=recall, kb=kb_recall, profile=profile):
                 if interrupt_event.is_set():
                     break
+                if not reply_parts and turn:
+                    turn["first_sentence"] = time.perf_counter()
                 emit("agent_chunk", sentence)
                 reply_parts.append(sentence)
                 if mode() == "voice":
                     await tts.speak(sentence)
             emit("agent_end")
+            log.info("[Reply] %d sentence(s): %s", len(reply_parts), " | ".join(reply_parts)[:600])
+            if turn.get("first_sentence"):
+                asyncio.create_task(_log_latency(turn, tts))
         except Exception as e:
             emit("agent_end")
             log.warning("reply failed: %r", e)
