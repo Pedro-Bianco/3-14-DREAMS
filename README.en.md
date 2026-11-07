@@ -134,6 +134,11 @@ satellites** move in real time at their altitude, with the ISS highlighted. Toda
 as circles sized by magnitude and radios around the world as violet dots. **Aircraft** show up live
 when you zoom into a region (see [below](#live-aircraft)).
 
+When it opens, the camera starts close to the surface and pulls back to the whole globe, filling the
+window, and the menus fade back in once it is in place. The globe is drawn by the graphics card
+(OpenGL, any GPU): at 120 frames per second, each frame takes 2–7 ms in a 2330×926 window. Without
+OpenGL (a remote session, an old driver) the CPU draws it.
+
 While it is open, a **dedicated agent** takes over the conversation with monitoring functions
 only. Click a country or ask about a place and the globe turns there while it answers:
 

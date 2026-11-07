@@ -416,15 +416,74 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         self._appearance_area.grid_remove()
         self._memory_map_frame.grid_remove()
         self._monitor_view.grid(row=0, column=0, sticky="nsew", pady=(theme.px(8), 0))   # caption stays below
+        self._cover_for_intro()
         self._monitor_view.open()
         theme.set_kind(self._monitor_button, "on")
         self._chat_insert("\n  🌍 Monitoramento: pergunte por notícias, clima, terremotos, voos, rádios ou satélites "
                           "de qualquer lugar, ou clique num país. Diga \"fechar monitoramento\" para voltar.\n", "info")
 
+    def _cover_for_intro(self):
+        """The opening zoom-out fills the whole PI dreams window, over the panels and menus: a borderless
+        window on top of it that the globe draws into. When the globe is in its place, the same window
+        becomes a veil over the rest that fades away (Tk has no per-widget transparency)."""
+        self._drop_cover()
+        root = self.root
+        root.update_idletasks()
+        cover = tk.Toplevel(root, bg=theme.BG)
+        # No transient(): on Windows a borderless window that is also transient never shows (tested
+        # 2026-11-07 — the opening ran, unseen, behind the app).
+        cover.overrideredirect(True)
+        cover.geometry(f"{root.winfo_width()}x{root.winfo_height()}+{root.winfo_rootx()}+{root.winfo_rooty()}")
+        surface = tk.Frame(cover, bg=theme.BG)
+        surface.pack(fill=tk.BOTH, expand=True)
+        cover.lift()
+        cover.update()                            # the surface has its real size before the first frame
+        self._cover = cover
+        globe = self._monitor_view.globe
+        globe.show_on(surface)
+        globe.on_intro_done = lambda: self._fade_cover(surface)
+
+    def _fade_cover(self, surface):
+        globe = self._monitor_view.globe
+        globe.on_intro_done = None
+        globe.show_on(None)
+        cover = getattr(self, "_cover", None)
+        if cover is None:
+            return
+        surface.destroy()
+        key = theme.TRANSPARENT_KEY               # see-through: the hole over the globe
+        cover.attributes("-transparentcolor", key)
+        veil = tk.Canvas(cover, bg=theme.BG, highlightthickness=0)
+        veil.pack(fill=tk.BOTH, expand=True)
+        cover.update_idletasks()
+        x, y = globe.surface.winfo_rootx() - cover.winfo_rootx(), globe.surface.winfo_rooty() - cover.winfo_rooty()
+        veil.create_rectangle(x, y, x + globe.surface.winfo_width(), y + globe.surface.winfo_height(),
+                              fill=key, outline=key)
+        started = time.monotonic()
+
+        def step():
+            if getattr(self, "_cover", None) is not cover:
+                return
+            p = min(1.0, (time.monotonic() - started) / 0.6)
+            cover.attributes("-alpha", 1 - p * p * (3 - 2 * p))   # smooth in and out
+            if p < 1:
+                cover.after(16, step)
+            else:
+                self._drop_cover()
+        step()
+
+    def _drop_cover(self):
+        cover, self._cover = getattr(self, "_cover", None), None
+        if cover is not None:
+            self._monitor_view.globe.on_intro_done = None
+            self._monitor_view.globe.show_on(None)
+            cover.destroy()
+
     def _close_monitor(self):
         if not self._monitor_ref["on"]:
             return
         self._monitor_ref["on"] = False
+        self._drop_cover()
         self._monitor_view.close()
         self._monitor_view.grid_remove()
         self._appearance_area.grid()

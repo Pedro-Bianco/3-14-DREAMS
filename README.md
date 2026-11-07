@@ -153,6 +153,11 @@ Espacial em destaque. Os terremotos do dia aparecem como círculos do tamanho da
 rádios do mundo, como pontos violeta. Os **aviões** aparecem ao vivo quando você aproxima uma região
 (veja [abaixo](#aviões-em-tempo-real)).
 
+Ao abrir, a câmera parte de perto da superfície e se afasta até o globo inteiro, ocupando a janela
+toda, e os menus voltam com um fade quando ele chega ao lugar. O globo é desenhado pela placa de vídeo
+(OpenGL, em qualquer GPU): a 120 quadros por segundo, cada quadro leva de 2 a 7 ms numa janela de
+2330×926. Sem OpenGL disponível (acesso remoto, driver antigo), ele é desenhado pelo processador.
+
 Enquanto o Monitoramento está aberto, um **agente próprio** assume a conversa, só com funções de
 monitoramento. Ao clicar num país ou perguntar sobre um lugar, o globo gira até lá e ele responde:
 

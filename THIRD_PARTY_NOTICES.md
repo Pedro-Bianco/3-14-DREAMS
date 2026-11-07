@@ -38,6 +38,7 @@ compatível com a GPL-3.0.
 | [pypdf](https://github.com/py-pdf/pypdf) | Texto de PDFs na base de conhecimento | BSD-3-Clause |
 | [pyperclip](https://github.com/asweigart/pyperclip) | Área de transferência | BSD-3-Clause |
 | [sgp4](https://github.com/brandon-rhodes/python-sgp4) | Posição dos satélites (Monitoramento) | MIT |
+| [PyOpenGL](https://github.com/mcfletch/pyopengl) | Globo do Monitoramento desenhado pela placa de vídeo | BSD-3-Clause |
 | [miniaudio](https://github.com/irmen/pyminiaudio) | Rádios MP3 (Monitoramento) | MIT |
 | Python 3.12 (embutido pelo PyInstaller) | Runtime | PSF License |
 

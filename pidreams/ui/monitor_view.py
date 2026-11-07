@@ -96,6 +96,7 @@ class MonitorView(tk.Frame):
     # ── open / close ──
 
     def open(self) -> None:
+        self.globe.intro()                       # zooms out from close to the surface to the whole globe
         self.globe.start()
         self._planes_tick()
         if not self._loaded:

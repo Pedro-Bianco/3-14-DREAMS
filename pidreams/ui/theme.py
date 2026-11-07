@@ -33,6 +33,7 @@ DANGER_BG = "#2E1418"
 # Monitoramento globe
 GLOBE_SPHERE = "#0B1A3F"  # the Earth behind the dots
 GLOBE_BORDER = "#7FE9FF"  # country borders
+TRANSPARENT_KEY = "#FF00FE"  # never shown: the see-through hole of the Monitoramento opening veil
 SAT_INTERNET = "#BFEFFF"  # internet constellations (most of the points)
 SAT_STATION  = "#FFF3A0"  # space stations and the ISS mark
 

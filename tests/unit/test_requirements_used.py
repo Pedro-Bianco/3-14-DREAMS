@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 
 # nome no requirements -> nome do import
 IMPORTS_AS = {
-    "faster-whisper": "faster_whisper", "kokoro-onnx": "kokoro_onnx", "pocket-tts": "pocket_tts", "espeakng-loader": "espeakng_loader", "qdrant-client": "qdrant_client",
+    "faster-whisper": "faster_whisper", "kokoro-onnx": "kokoro_onnx", "pocket-tts": "pocket_tts", "pyopengl": "OpenGL", "espeakng-loader": "espeakng_loader", "qdrant-client": "qdrant_client",
     "opencv-python": "cv2", "pillow": "PIL", "langchain-text-splitters": "langchain_text_splitters",
     "langchain-experimental": "langchain_experimental",
 }

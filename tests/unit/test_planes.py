@@ -107,9 +107,10 @@ def view(monkeypatch, tk_root):
     v = MonitorView(tk_root, on_close=lambda: None, on_ask=lambda _t: None, radio=_Radio())
     calls = []
     monkeypatch.setattr(sources, "aircraft", lambda lat, lon: calls.append((lat, lon)) or sources.parse_aircraft(RAW))
-    # Synchronous fetch: the thread would race with the test.
+    # Synchronous threads (the planes fetch, the globe's outline): a real one would race with the test.
     monkeypatch.setattr("pidreams.ui.monitor_view.threading.Thread",
-                        lambda target, args, daemon: type("T", (), {"start": lambda self: target(*args)})())
+                        lambda target, args=(), daemon=False: type("T", (), {"start": lambda self: target(*args),
+                                                                             "join": lambda self, timeout=None: None})())
     monkeypatch.setattr(v, "after", lambda ms, fn=None, *a: fn(*a) if ms == 0 and fn else "job")
     v.calls = calls
     yield v
@@ -178,9 +179,9 @@ def test_clique_acha_o_aviao_certo_entre_vizinhos(view):
         {"hex": "vizinho", "callsign": "EXM2", "lat": -23.50, "lon": -46.30, "speed_kt": 0, "track": 0, "fix_age_s": 0},
     ], now=__import__("time").monotonic())
     g = view.globe
-    g.canvas.config(width=600, height=600)
-    g.canvas.winfo_width = lambda: 600
-    g.canvas.winfo_height = lambda: 600
+    g.surface.config(width=600, height=600)
+    g.surface.winfo_width = lambda: 600
+    g.surface.winfo_height = lambda: 600
     g.render()
     sx, sy, vis = g._screen["plane"]
     assert vis.all() and abs(sx[1] - sx[0]) > 7                          # far enough apart to click each
@@ -224,19 +225,22 @@ def test_evento_do_agente_liga_a_camada_e_aproxima(view):
     assert not view.globe.layers["planes"]
 
 
-def test_contorno_detalhado_so_no_zoom_alto(view):
+def test_contorno_detalhado_carrega_em_segundo_plano(view):
+    """It took 809 ms the first time, in the middle of a zoom: now it loads when the globe starts,
+    and until then the zoom uses the coarse outline instead of waiting."""
     from pidreams.monitor import world
     outline = world.outline()
     assert outline.shape[1] == 2 and len(outline) > 100_000
     g = view.globe
-    g.canvas.winfo_width = lambda: 400
-    g.canvas.winfo_height = lambda: 400
-    g.zoom = 1.0
-    g.render()
-    assert g._outline is None                       # not even loaded while zoomed out
+    g.surface.winfo_width = lambda: 400
+    g.surface.winfo_height = lambda: 400
     g.zoom = 8.0
-    g.render()
+    g.render()                                      # not loaded yet: draws, with the coarse outline
+    g.start()
+    g._outline_thread.join(10)
+    g.stop()
     assert g._outline is not None and len(g._outline) == len(outline)
+    g.render()
 
 
 def test_localizar_voo_pelo_numero(monkeypatch):
@@ -292,3 +296,72 @@ def test_tela_informa_o_voo_selecionado(view):
     assert view.selected_flight() == "EXM1001"
     view.globe.selected = ("plane", "e4a003")                                     # no flight number
     assert view.selected_flight() is None
+
+
+def test_animacao_de_entrada_termina_no_globo_inteiro(view):
+    from pidreams.ui import globe as globe_mod
+    g = view.globe
+    g.intro()
+    t0 = g._intro_t0
+    g._step_intro(t0, 0.033)
+    assert g.zoom == pytest.approx(globe_mod._INTRO_ZOOM) and g._fade < 0.5        # starts close and dark
+    g._step_intro(t0 + globe_mod._INTRO_S / 2, 0.033)
+    assert 1.0 < g.zoom < globe_mod._INTRO_ZOOM
+    g._step_intro(t0 + globe_mod._INTRO_S + 0.01, 0.033)
+    assert (g.zoom, g._fade, g._intro_t0) == (1.0, 1.0, None)                       # the whole globe, full light
+
+
+def test_fundo_por_tabela_igual_ao_calculo_direto(view):
+    """The lookup table replaced computing the sphere for every pixel on every zoom step."""
+    import numpy as np
+    from pidreams.ui import globe as globe_mod
+    g = view.globe
+    w, h, radius, cx, cy = 200, 150, 60.0, 100.0, 75.0
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    d = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2) / radius
+    img = np.empty((h, w, 3), np.float32)
+    img[:] = globe_mod._BG
+    inside = d < 1
+    img[inside] = globe_mod._SPHERE * (0.55 + 0.45 * np.sqrt(1 - d[inside] ** 2))[:, None] + globe_mod._BG * 0.2
+    glow = np.clip(1 - np.abs(d - 1) * 14, 0, 1) * 0.55 + np.clip(1 - (d - 1) * 3, 0, 1) * (d > 1) * 0.12
+    img += glow[..., None] * globe_mod._LAND * 0.45
+    direct = np.clip(img, 0, 255).astype(np.int16)
+    looked_up = g._background(w, h, radius, cx, cy).astype(np.int16)
+    diff = np.abs(looked_up - direct).max(axis=2)
+    # Equal everywhere but on the sphere's very edge, where one pixel can fall on either side.
+    assert diff.mean() < 0.2
+    assert (np.abs(d[diff > 4] - 1) < 1.5 / radius).all()
+
+
+def test_rodinha_desliza_ate_o_zoom_e_encerra_a_abertura(view):
+    """The wheel sets a goal the frames glide to; using it during the opening ends the animation
+    with the points at full light."""
+    from types import SimpleNamespace
+    g = view.globe
+    g.intro()
+    g.zoom, g._fade = 1.0, 0.3                     # partway through the opening
+    g._wheel(SimpleNamespace(delta=120))
+    assert g._intro_t0 is None and g._fade == 1.0
+    assert g.zoom == 1.0 and g._zoom_goal == pytest.approx(1.12)          # not yet: the frames take it there
+    g.surface.winfo_ismapped = lambda: True
+    g.render = lambda: None
+    for _ in range(40):
+        g._last_tick = __import__("time").monotonic() - 0.033
+        g._tick()
+    assert g._zoom_goal is None and g.zoom == pytest.approx(1.12)
+
+
+def test_sem_opengl_o_globo_desenha_com_gdi(view, monkeypatch):
+    """A remote session or an old driver: the painter fails to start and GDI draws the same frame."""
+    from pidreams.ui import globe_gl
+
+    def no_gl(*_a, **_k):
+        raise globe_gl.GLUnavailable("sem OpenGL neste teste")
+    monkeypatch.setattr(globe_gl, "GlobePainter", no_gl)
+    g = view.globe
+    g._painters.clear()
+    g.surface.winfo_width = lambda: 400
+    g.surface.winfo_height = lambda: 300
+    g.render()
+    assert g._painters[g.surface.winfo_id()] is None and g._gdi.size == (400, 300)
+    assert g._gdi.pixels[150, 200, :3].any()                    # the sphere was painted

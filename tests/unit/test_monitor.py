@@ -224,7 +224,7 @@ def test_globo_desenha_e_acha_o_pais_clicado():
     root.update()
     g.lon0, g.lat0 = math.radians(139.7), math.radians(35.7)        # Tokyo in the centre
     g.render()
-    lat, lon = g.screen_to_latlon(g.canvas.winfo_width() / 2, g.canvas.winfo_height() / 2)
+    lat, lon = g.screen_to_latlon(g.surface.winfo_width() / 2, g.surface.winfo_height() / 2)
     assert abs(lat - 35.7) < 0.5 and abs(lon - 139.7) < 0.5
     assert world.country_at(lat, lon)["name"] == "Japão"
     root.destroy()
