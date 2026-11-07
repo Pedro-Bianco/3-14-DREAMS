@@ -32,6 +32,9 @@ binaries += collect_dynamic_libs("espeakng_loader")    # espeak-ng.dll (pronunci
 hiddenimports = []
 hiddenimports += collect_submodules("pidreams")
 hiddenimports += collect_submodules("tiktoken_ext")
+# SciPy picks its array backends by name at run time; without these the voice failed to load in the
+# packaged app (No module named 'scipy._external.array_api_compat.numpy.fft', 2026-11-07).
+hiddenimports += collect_submodules("scipy._external.array_api_compat")
 hiddenimports += collect_submodules("kokoro_onnx") + collect_submodules("phonemizer")   # imported lazily
 hiddenimports += ["sounddevice", "PIL.ImageTk", "miniaudio", "sgp4.api", "sgp4.omm"]
 
@@ -41,9 +44,9 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    # PyTorch is needed by the default voice (pocket-tts); its web server parts are not.
-    excludes=["matplotlib", "IPython", "jupyter", "pytest", "tensorflow", "torchvision", "torchaudio",
-              "fastapi", "uvicorn", "starlette", "typer"],
+    # PyTorch is needed by the default voice (pocket-tts). starlette and uvicorn stay: the MCP library
+    # imports them on start (leaving them out made v0.9.0 and v0.9.1 fail to open).
+    excludes=["matplotlib", "IPython", "jupyter", "pytest", "tensorflow", "torchvision", "torchaudio", "fastapi"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)

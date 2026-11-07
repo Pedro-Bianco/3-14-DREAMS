@@ -46,7 +46,44 @@ def run_wizard(settings) -> bool:
     return finished
 
 
+def check_imports() -> int:
+    """PIDreams.exe --check-imports: imports every module of the app, as packaged, and says one
+    sentence with the default voice when its files are there. The build runs it: v0.9.0 and v0.9.1
+    shipped without starlette (MCP needs it) and did not even open, while every test passed from the
+    source. Failures go to logs/check-imports.log; 0 = all imported."""
+    import importlib
+    import pkgutil
+
+    import pidreams
+
+    failures = []
+    for module in pkgutil.walk_packages(pidreams.__path__, "pidreams."):
+        try:
+            importlib.import_module(module.name)
+        except Exception as e:                    # noqa: BLE001 — every failure is reported, not just the first
+            failures.append(f"{module.name}: {type(e).__name__}: {e}")
+    # What the app only loads when it is used: the GPU globe and the voice, which once imported fine and
+    # then failed on its first sentence (a SciPy module picked at run time).
+    try:
+        importlib.import_module("OpenGL.GL")
+    except Exception as e:                        # noqa: BLE001
+        failures.append(f"OpenGL.GL: {type(e).__name__}: {e}")
+    from pidreams.hardware import models
+    if models.pocket_present():
+        try:
+            from pidreams.audio.pocket import PocketVoice
+            if not sum(len(c) for c in PocketVoice("baritono.safetensors").stream("Teste da voz.")):
+                failures.append("voice: no audio")
+        except Exception as e:                    # noqa: BLE001
+            failures.append(f"voice: {type(e).__name__}: {e}")
+    (paths.logs_dir() / "check-imports.log").write_text("\n".join(failures) or "ok", encoding="utf-8")
+    return 1 if failures else 0
+
+
 def main():
+    if "--check-imports" in sys.argv:
+        paths.ensure_dirs()
+        sys.exit(check_imports())
     from pidreams.ui import theme
 
     theme.enable_dpi_awareness()     # before any window, or Windows blurs it at 125%+

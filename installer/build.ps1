@@ -30,6 +30,16 @@ Step "PIDreams.exe (PyInstaller)"
 & $Python -m PyInstaller installer\pidreams.spec --noconfirm --clean --distpath dist --workpath build
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
+Step "PIDreams.exe imports every module (as packaged)"
+# The tests run from the source; this runs the packaged app, which is what the user installs.
+$check = Start-Process -FilePath "dist\PIDreams\PIDreams.exe" -ArgumentList "--check-imports" -Wait -PassThru
+$report = Join-Path $env:LOCALAPPDATA "PIDreams\logs\check-imports.log"
+if ($check.ExitCode -ne 0) {
+    if (Test-Path $report) { Get-Content $report | Write-Host -ForegroundColor Red }
+    throw "the packaged app cannot import all of its modules — build stopped"
+}
+Write-Host "all modules import in the packaged app"
+
 Step "Installer (Inno Setup)"
 $Iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") |
     Where-Object { Test-Path $_ } | Select-Object -First 1
