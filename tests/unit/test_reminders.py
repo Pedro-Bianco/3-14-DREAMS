@@ -58,3 +58,15 @@ def test_ultimo_resumo():
     assert reminders.last_briefing() == ""
     reminders.record_briefing(FRIDAY.date())
     assert reminders.last_briefing() == "2026-10-30"
+
+
+def test_apagar_todos_e_lista_quando_nao_acha():
+    """Visto em 2026-11-09: "apague os lembretes" virou uma busca por esse texto, e o PI disse que não
+    havia nenhum (o cartão mostrava dois)."""
+    reminders.criar_lembrete("pagar a conta de luz", "sexta", FRIDAY)
+    reminders.criar_lembrete("ligar para a escola", "amanhã às 15h", FRIDAY)
+    miss = reminders.tirar_lembrete("os lembretes de ontem")
+    assert "Os pendentes são" in miss and "conta de luz" in miss
+    assert reminders.tirar_lembrete("todos") == "Tirei 2 lembrete(s) da lista."
+    assert reminders.pending_items() == []
+    assert reminders.tirar_lembrete("todos os lembretes") == "A lista de lembretes já estava vazia."

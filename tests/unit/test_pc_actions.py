@@ -188,3 +188,21 @@ def test_open_app_says_when_nothing_was_found(monkeypatch):
     monkeypatch.setattr(tools, "_allowed_apps", None)
     result = tools.open_app("monitoramento")
     assert "Não encontrei" in result and "Nada foi aberto" in result
+
+
+def test_web_search_never_carries_the_users_identity(tmp_path, monkeypatch):
+    """Seen on 2026-11-09: asked for cafés nearby, the model searched for them "próximos a <tratamento>,
+    região de <empresa>" — personal data sent to Google. Fictitious data here."""
+    from pidreams.agent import tools
+    from pidreams.core import settings
+    from pidreams.core.settings import Settings
+
+    s = Settings(tmp_path / "settings.json")
+    s.set("treatment", "Senhor Silva")
+    monkeypatch.setattr(settings, "SETTINGS", s)
+    tools.set_profile(["O nome do usuário é Carlos Silva", "O usuário trabalha na empresa Acme",
+                       "O usuário gosta de Python"])
+    assert tools._without_personal("cafés próximos a Senhor Silva, região de Acme") == "cafés próximos"
+    assert tools._without_personal("tutorial de Python") == "tutorial de Python"        # a taste, not identity
+    assert tools._without_personal("cotação do dólar hoje") == "cotação do dólar hoje"
+    tools.set_profile([])

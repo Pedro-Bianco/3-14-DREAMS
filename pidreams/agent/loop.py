@@ -161,6 +161,7 @@ async def run_agent(
     monitor_ref: dict | None = None,
     research_ref: dict | None = None,
     sleep_ref: list | None = None,
+    wait_stores: Callable[[], tuple] | None = None,
 ):
     """monitor_ref: {"on": bool, "tools": MonitorAgentTools, "fresh": bool} — while "on", the
     monitor's own agent answers (no memory, documents or reflection in those turns).
@@ -188,18 +189,38 @@ async def run_agent(
     emit("status", "⏳ Carregando componentes...")
 
     recorder   = AudioRecorder(mic_device_ref=mic_device_ref)
-    transcriber = await asyncio.to_thread(Transcriber)
+    llm        = LLMAgent()
+    emit("boot", "reconhecimento")                # the startup animation follows these steps
+
+    async def _prewarm():
+        """The conversation model loads onto the GPU while the rest loads (it was the last ~14 s of a
+        one-after-another start). Any failure is left to the checks below, which report it."""
+        if asleep():
+            return
+        try:
+            from pidreams.hardware import ollama_supervisor
+
+            await asyncio.to_thread(ollama_supervisor.ensure)
+            await llm.warmup()
+        except Exception as e:                      # noqa: BLE001
+            log.info("prewarm skipped: %r", e)
+
+    # Speech recognition (GPU or CPU), the voice (CPU) and the conversation model (Ollama) load at the
+    # same time, next to the memory the window is loading: none depends on another.
+    prewarm = asyncio.create_task(_prewarm())
+    tts        = TTSEngine(out_device_ref=out_device_ref, volume_ref=volume_ref)
+    transcriber, _ = await asyncio.gather(asyncio.to_thread(Transcriber), asyncio.to_thread(tts.start))
     if transcriber.notice:
         emit("problem", problems.problem("stt_gpu", transcriber.notice, [], level="warning"))
-    llm        = LLMAgent()
     monitor_llm: LLMAgent | None = None     # created when the monitor opens, dropped when it reopens
     research_llm: LLMAgent | None = None    # same, for the deep-research mode
 
     def research_news() -> bool:
         """A research milestone or result is waiting to be spoken."""
         return research_ref is not None and not research_ref["tools"].announcements.empty()
-    tts        = TTSEngine(out_device_ref=out_device_ref, volume_ref=volume_ref)
-    tts.start()
+    emit("boot", "voz")
+    if wait_stores is not None:                    # the window loads the memory in parallel
+        ltm_store, kb_store = await asyncio.to_thread(wait_stores)
 
     def _on_ltm_store(fact: str):
         emit("ltm_stored", fact)
@@ -211,6 +232,8 @@ async def run_agent(
     kb_context = {"question": ""}       # last question that found document pieces
     reflection = _Reflection(memory)
 
+    emit("boot", "modelo")
+    await prewarm                                  # usually done by now: the checks below are instant
     # Never gives up: notifies with an action and checks again until it is solved.
     while True:
         emit("status", "🔁 Verificando o Ollama...")
@@ -232,7 +255,9 @@ async def run_agent(
             emit("problem", problems.from_chat(e))
 
     model_loaded = not asleep()
+    emit("boot", "microfone")
     await recorder.calibrate()
+    emit("boot", "pronto")
 
     # Confirmation for MCP tools that change something. Runs on the tool's thread;
     # speech and the microphone are requested from this loop.
@@ -514,6 +539,7 @@ async def run_agent(
         query_vector = await asyncio.to_thread(memory.embed_query, text) if use_memory else None
         recall_task = asyncio.create_task(memory.search(text, query_vector)) if use_memory else None
         profile = await asyncio.to_thread(memory.profile) if use_memory else []
+        tools.set_profile(profile)          # identity words never go into a web search
 
         # With documents saved, every question looks them up (not only trigger words): the search
         # only returns pieces above the score floor, so unrelated questions get nothing. A follow-up

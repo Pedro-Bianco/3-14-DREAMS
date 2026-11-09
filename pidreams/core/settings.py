@@ -25,7 +25,8 @@ DEFAULTS: dict[str, Any] = {
     "treatment": "",
     "persona_id": "espirituoso",
     "appearance": "rosto",       # id from pidreams/ui/appearances (unknown = rosto)
-    "audio": {"input_device": None, "output_device": None, "volume": 1.0},
+    # startup_sound: the chime played with the startup animation (audio/startup_sound.py).
+    "audio": {"input_device": None, "output_device": None, "volume": 1.0, "startup_sound": True},
     # effect: "" = off. wake_name: in voice mode, answer only speech that starts with the name.
     "voice": {"model": "pocket-baritono", "length_scale": 1.0, "effect": "forte", "wake_name": False},
     "weather": {"city": ""},

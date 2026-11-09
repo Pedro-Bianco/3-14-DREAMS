@@ -36,9 +36,10 @@ SCHEMAS = [
     _schema("ver_lembretes", "Lista os lembretes pendentes do usuário. Use quando ele perguntar pelos lembretes.",
             {}, []),
     _schema("tirar_lembrete",
-            "Tira um lembrete da lista: quando o usuário disser que já fez a coisa lembrada ('já paguei a "
-            "conta de luz') ou pedir para apagar um lembrete.",
-            {"texto": {"type": "string", "description": "Um trecho do lembrete (ex.: 'conta de luz')."}},
+            "Tira lembretes da lista: quando o usuário disser que já fez a coisa lembrada ('já paguei a "
+            "conta de luz') ou pedir para apagar um lembrete — ou todos ('apaga os lembretes').",
+            {"texto": {"type": "string", "description": (
+                "Um trecho do lembrete (ex.: 'conta de luz'), ou 'todos' para tirar todos os pendentes.")}},
             ["texto"]),
 ]
 
@@ -129,7 +130,11 @@ def _pick(snippet: str) -> tuple[dict | None, str]:
     if len(found) == 1:
         return found[0], ""
     if not found:
-        return None, f"Não achei lembrete pendente com '{snippet}'."
+        others = pending_items()
+        if not others:
+            return None, "Não há lembretes pendentes."
+        return None, (f"Não achei lembrete com '{snippet}'. Os pendentes são: "
+                      + "; ".join(describe(l) for l in others) + ". Pergunte qual tirar, ou use 'todos'.")
     return None, "Achei mais de um: " + "; ".join(describe(l) for l in found) + ". Qual deles?"
 
 
@@ -151,8 +156,21 @@ def ver_lembretes(now: dt.datetime | None = None) -> str:
     return ("Lembretes pendentes: " + "; ".join(describe(l, now) for l in items) + ".") if items         else "Nenhum lembrete pendente."
 
 
+_ALL = {"todos", "todas", "tudo", "os lembretes", "todos os lembretes", "lembretes", "todos eles"}
+
+
 def tirar_lembrete(texto: str) -> str:
-    """Done and deleted are the same to the person: it leaves the list (kept in the file as done)."""
+    """Done and deleted are the same to the person: it leaves the list (kept in the file as done).
+    "todos" clears the list: asked to "apague os lembretes", the model searched for a reminder with
+    that text, found none and told the user there were none (2026-11-09)."""
+    if _normalize(texto) in {_normalize(w) for w in _ALL}:
+        with _LOCK:
+            stored = _read()
+            gone = [l for l in stored["lembretes"] if l["estado"] != "concluido"]
+            for l in gone:
+                l["estado"] = "concluido"
+            _write(stored)
+        return f"Tirei {len(gone)} lembrete(s) da lista." if gone else "A lista de lembretes já estava vazia."
     reminder, error = _pick(texto)
     if reminder is None:
         return error

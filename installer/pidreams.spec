@@ -18,6 +18,7 @@ datas = [
     (str(ROOT / "pidreams" / "agent" / "personas" / "*.json"), "pidreams/agent/personas"),
     (str(ROOT / "pidreams" / "assets" / "voices"), "pidreams/assets/voices"),   # default voice state
     (str(ROOT / "pidreams" / "assets" / "pidreams.ico"), "pidreams/assets"),   # tray icon
+    (str(ROOT / "pidreams" / "assets" / "sounds"), "pidreams/assets/sounds"),   # startup sound
 ]
 datas += collect_data_files("faster_whisper")          # voice filter model (Silero)
 datas += collect_data_files("pocket_tts")             # default voice: model configs (weights downloaded at install)

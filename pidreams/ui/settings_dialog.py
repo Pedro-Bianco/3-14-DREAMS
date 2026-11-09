@@ -57,6 +57,7 @@ class SettingsDialog:
             "tray.speak_reminders": tk.BooleanVar(value=settings.get("tray.speak_reminders")),
             "voice.wake_name": tk.BooleanVar(value=settings.get("voice.wake_name")),
             "stt.engine": tk.StringVar(value=_STT_LABEL[settings.get("stt.engine")]),
+            "audio.startup_sound": tk.BooleanVar(value=settings.get("audio.startup_sound")),
             "privacy.log_speech": tk.BooleanVar(value=settings.get("privacy.log_speech")),
         }
         for title, build in (("Geral", self._general), ("Áudio e voz", self._audio), ("Bandeja", self._tray),
@@ -139,6 +140,8 @@ class SettingsDialog:
         self._items(tab, self.v["voice.effect"], list(_EFFECTS_LABEL.values()))
         self._label(tab, "Velocidade da fala (maior = mais devagar)")
         theme.Slider(tab, self.v["voice.length_scale"], 0.5, 2.0).pack(fill=tk.X)
+        theme.check(tab, "Tocar o som de abertura quando o PI abrir", self.v["audio.startup_sound"]).pack(
+            anchor="w", pady=(theme.px(10), 0))
         theme.check(tab, "Só responder quando eu chamar pelo nome (ex.: \"PI, que horas são?\") — "
                          "conversas com outras pessoas, TV e ligações ficam sem resposta",
                     self.v["voice.wake_name"]).pack(anchor="w", pady=(theme.px(10), 0))

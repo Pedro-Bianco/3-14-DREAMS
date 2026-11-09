@@ -47,6 +47,10 @@
 - **[Pesquisa profunda](#pesquisa-profunda)**: tira dúvidas sobre o tema com perguntas de
   múltipla escolha, pesquisa na Wikipédia e nas notícias, lê as fontes e escreve um relatório com
   citações, que fica guardado na Base.
+- **Abertura animada**: enquanto carrega, o centro da janela mostra anéis em estilo HUD e um anel de
+  progresso que segue as etapas reais (memória, reconhecimento de voz, voz, modelo de conversa,
+  microfone), com um som de abertura original — sintetizado pelo próprio projeto, sem trechos de
+  músicas de terceiros (dá para desligar em Configurações → Áudio e voz).
 - **[Bandeja e palmas](#bandeja-e-palmas)**: dorme ao lado do relógio sem ocupar a placa de vídeo,
   acorda com duas palmas ou um clique, pode iniciar com o Windows e fecha sozinho quando um jogo abre.
 - **[Rotinas e chamada pelo nome](#rotinas-e-chamada-pelo-nome)**: sequências de ações com uma frase

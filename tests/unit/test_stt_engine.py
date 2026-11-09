@@ -62,3 +62,11 @@ def test_silence_never_reaches_the_gpu_model(setup, monkeypatch):
     assert t.engine == "turbo"
     silence = (np.random.default_rng(0).standard_normal(16000 * 2) * 0.001).astype(np.float32)
     assert t.transcribe(silence) == "" and calls == []
+
+
+def test_startup_sound_is_a_short_stereo_file():
+    from pidreams.audio import startup_sound
+
+    data, rate = startup_sound._read()
+    assert rate == 44100 and data.shape[1] == 2
+    assert 2.0 < len(data) / rate <= 6.0 and 0.5 < abs(data).max() <= 1.0

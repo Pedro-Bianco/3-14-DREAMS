@@ -1,6 +1,6 @@
 ; PI dreams installer — Inno Setup 6. Build it with installer\build.ps1.
 
-#define AppVersion "1.1.0"
+#define AppVersion "1.2.0"
 ; Ollama older than this gets updated. Set by measurement
 ; (first version with Vulkan on by default).
 #define MinOllama "0.40.6"

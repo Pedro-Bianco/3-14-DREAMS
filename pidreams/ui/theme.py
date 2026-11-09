@@ -28,6 +28,7 @@ OK        = "#34D399"
 PEACH     = "#F59E8B"   # third meter color (GPU)
 WARN      = "#FBBF24"
 DANGER    = "#F87171"
+SPARK     = "#FFFFFF"   # brightest highlight: tip of the startup progress ring and its final pulse
 WARN_BG   = "#2A2410"   # notice bar behind WARN text
 DANGER_BG = "#2E1418"
 # Monitoramento globe

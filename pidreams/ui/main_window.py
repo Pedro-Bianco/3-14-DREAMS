@@ -16,6 +16,7 @@ from pidreams import pc
 from pidreams.agent import problems
 from pidreams.agent.loop import run_agent
 from pidreams.audio import devices
+from pidreams.audio import startup_sound
 from pidreams.audio.claps import ClapListener
 from pidreams.audio import tts as tts_audio
 from pidreams.core import paths
@@ -29,6 +30,7 @@ from pidreams.mcp import confirmation
 from pidreams.mcp.connections import Connections
 from pidreams.pc.games import game_running
 from pidreams.ui import appearances, theme
+from pidreams.ui.boot_splash import BootSplash
 from pidreams.ui.tray import TrayIcon
 from pidreams.ui.widgets import SystemMonitor, WeatherFetcher, MeterWidget
 from pidreams.ui.camera_window import CameraWindowMixin
@@ -96,6 +98,7 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         if start_asleep:                 # started with Windows: straight to the tray, no flash
             self.root.withdraw()
         self._start_asleep = start_asleep
+        self._t_open = time.monotonic()
         theme.init(self.root)
         self.root.title(WINDOW_TITLE)
         self.root.configure(bg=theme.GLASS)
@@ -385,6 +388,17 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         self._appearance_frame = tk.Frame(self._appearance_area, bg=theme.GLASS)
         self._appearance_frame.place(relx=0.5, rely=0.5, anchor="center")
         self._switch_appearance(SETTINGS.get("appearance"))
+        # While the app loads (~30 s), the startup animation stands in for the appearance; started in
+        # the tray there is no window to show it.
+        self._boot: BootSplash | None = None
+        if not self._start_asleep:
+            if SETTINGS.get("audio.startup_sound"):
+                self.root.after(150, lambda: startup_sound.play(self._out_device_ref[0], self._volume_ref[0]))
+            self._sphere.stop()
+            self._sphere.pack_forget()
+            self._boot = BootSplash(self._appearance_frame, self._appearance_size, theme.GLASS)
+            self._boot.pack()
+            self._boot.step("memoria")
         self._appearance_area.bind("<Configure>", lambda _e: self._debounce("appearance", 100, self._fit_appearance))
         self._today = TodayPanel(self._appearance_area, self._connections)
 
@@ -814,6 +828,14 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         elif etype == "claps":
             self._set_claps(data)
 
+        elif etype == "boot":
+            if data == "pronto":
+                log.info("startup: ready %.1f s after the window opened", time.monotonic() - self._t_open)
+            if self._boot and data == "pronto":
+                self._boot.ready(self._end_boot)
+            elif self._boot:
+                self._boot.step(data)
+
         elif etype == "reminder_asleep":
             # Asleep there is no window to show it: a Windows notification from the tray icon.
             if not (self._tray and self._tray.notify("PI dreams — lembrete", data)):
@@ -847,7 +869,7 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
             if label_text is not None and var.get() != label_text:
                 var.set(label_text)
         self._warn_missing_devices()
-        if st.get("appearance") != self._sphere.id:
+        if st.get("appearance") != self._sphere.id and not self._boot:      # booting: applied at the end
             self._switch_appearance(st.get("appearance"))
 
     def _warn_missing_devices(self):
@@ -905,6 +927,14 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         if self._sphere:
             self._sphere.set_state(state)
 
+    def _end_boot(self):
+        """The startup animation ends: the chosen appearance takes its place."""
+        if self._boot:
+            self._boot.stop()
+            self._boot.destroy()
+            self._boot = None
+        self._switch_appearance(SETTINGS.get("appearance"))
+
     def _switch_appearance(self, id_: str):
         """Switches right away: the voice and the microphone run on other threads and do not
         depend on the widget; the new appearance starts in the current state."""
@@ -936,7 +966,10 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         # Recreate only on a real change: small drags would restart the animation for nothing.
         if abs(size - self._appearance_size) > self._appearance_size * 0.08:
             self._appearance_size = size
-            self._switch_appearance(self._sphere.id)
+            if self._boot:
+                self._boot.resize(size)
+            else:
+                self._switch_appearance(self._sphere.id)
         if show_today:
             self._today.show(self._appearance_size, area.winfo_width(), area.winfo_height())
         else:
@@ -1003,9 +1036,13 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         self._mem_show_all()
         self._kb_refresh()
 
-    def _run_agent_thread(self):
-        # Wait for the stores before starting (they load in the background)
+    def _wait_stores(self) -> tuple:
         self._stores_ready.wait()
+        return self._ltm_store, self._kb_store
+
+    def _run_agent_thread(self):
+        # Starts at once: the loop loads speech, voice and the model while the stores load, and asks
+        # for the stores (wait_stores) only when it needs them.
 
         async def _run():
             self._stop_event = asyncio.Event()
@@ -1024,6 +1061,7 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
                 monitor_ref=self._monitor_ref,
                 research_ref=self._research_ref,
                 sleep_ref=self._sleep_ref,
+                wait_stores=self._wait_stores,
             )
             self._emit("stopped")
 

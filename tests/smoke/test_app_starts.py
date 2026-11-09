@@ -46,6 +46,7 @@ def test_aparencia_troca_ao_vivo_sem_vazar_memoria(monkeypatch):
 
     monkeypatch.setattr(widgets.WeatherFetcher, "_run", lambda self: None)
     app = create_window(main_window.AgentApp)
+    app._end_boot()                      # the loop is not running here: end the startup animation by hand
     ids = list(appearances.CATALOG)
 
     def swap_val(id_):
@@ -71,6 +72,29 @@ def test_aparencia_troca_ao_vivo_sem_vazar_memoria(monkeypatch):
         gc.collect()
         app.root.update()
         assert process.memory_info().rss - before < 10 * 1024 * 1024
+    finally:
+        app._sphere.stop()
+        app.root.destroy()
+
+
+def test_a_animacao_de_abertura_segue_as_etapas_e_da_lugar_a_aparencia(monkeypatch):
+    from pidreams.ui import main_window, widgets
+    from pidreams.ui.boot_splash import BootSplash
+
+    monkeypatch.setattr(widgets.WeatherFetcher, "_run", lambda self: None)
+    app = create_window(main_window.AgentApp)
+    try:
+        assert isinstance(app._boot, BootSplash)
+        for step in ("reconhecimento", "voz", "modelo", "microfone"):
+            app._handle_event("boot", step)
+        assert app._boot._index == 4
+        app._handle_event("boot", "pronto")
+        end = time.time() + 3
+        while app._boot is not None and time.time() < end:
+            app.root.update()
+            time.sleep(0.02)
+        assert app._boot is None
+        assert app._sphere.winfo_ismapped() or app._sphere in app._appearance_frame.winfo_children()
     finally:
         app._sphere.stop()
         app.root.destroy()

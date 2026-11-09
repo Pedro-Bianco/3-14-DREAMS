@@ -56,3 +56,11 @@ def _never_write_real_data(monkeypatch):
         if before is not None:
             real_dispatch.write_bytes(before)           # devolve o arquivo do usuário intacto
         pytest.fail(f"o teste alterou o settings.json real ({real_dispatch})")
+
+
+@pytest.fixture(autouse=True)
+def _no_startup_sound(monkeypatch):
+    """Tests open many windows: the startup chime must not play through the speakers each time."""
+    from pidreams.audio import startup_sound
+
+    monkeypatch.setattr(startup_sound, "play", lambda *_a, **_kw: None)

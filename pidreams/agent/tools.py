@@ -1,3 +1,4 @@
+import re
 import os
 import webbrowser
 import urllib.request
@@ -102,7 +103,11 @@ TOOL_SCHEMAS = [
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Termo ou pergunta a pesquisar.",
+                        "description": (
+                            "Só as palavras do assunto. NUNCA coloque o nome, o tratamento, a empresa, "
+                            "a cidade ou outros dados do usuário: a busca vai para o Google. Para lugares "
+                            "perto dele, escreva 'perto de mim' (o navegador sabe onde ele está)."
+                        ),
                     }
                 },
                 "required": ["query"],
@@ -195,6 +200,7 @@ def web_search(query: str) -> str:
     from pidreams.monitor import sources as monitor_sources
     from pidreams.research import sources as research_sources
 
+    query = _without_personal(query)
     webbrowser.open(f"https://www.google.com/search?q={urllib.parse.quote_plus(query)}")
     parts = []
     try:
@@ -209,7 +215,42 @@ def web_search(query: str) -> str:
     if parts:
         return (f"Busca aberta no navegador. O que a Wikipédia e as notícias recentes dizem sobre '{query}':\n\n"
                 + "\n\n".join(parts))
-    return f"Busca aberta no navegador para: {query}. Não achei nada na Wikipédia nem nas notícias recentes."
+    # Not "nothing found": the results are on the user's screen, only not readable by the app (asked for
+    # cafés nearby, the model said the search found nothing while Google listed them, 2026-11-09).
+    return (f"Abri a busca '{query}' no navegador do usuário: os resultados estão na tela dele. Eu não leio a "
+            "página do Google; a Wikipédia e as notícias não têm nada sobre isso. Diga que a busca está aberta "
+            "no navegador — não diga que não encontrou resultados.")
+
+
+# Words the search must not carry: seen on 2026-11-09, the model filled "cafés próximos" with the form of
+# address and the user's employer from memory as the "location", sent to Google.
+_DANGLING = re.compile(r"(?:\s*,)?\s*\b(?:a|ao|à|de|do|da|em|no|na|para|pra|regi[aã]o de)\s*$", re.IGNORECASE)
+# Memory facts about who the user is and where: their capitalized words (names, employer, city) stay home.
+_IDENTITY_FACT = re.compile(r"\b(nome|chama|empresa|trabalha|mora|cidade|bairro|endere[cç]o|rua)\b", re.IGNORECASE)
+_profile_words: set[str] = set()
+
+
+def set_profile(facts: list[str]) -> None:
+    """The loop hands over the memory profile of each turn (the model sees the same facts)."""
+    _profile_words.clear()
+    for fact in facts:
+        if _IDENTITY_FACT.search(fact):
+            _profile_words.update(w.strip(",.;:!?").lower() for w in fact.split()[1:]
+                                  if w[:1].isupper() and len(w.strip(",.;:!?")) > 2)
+
+
+def _without_personal(query: str) -> str:
+    """Takes the form of address and the identity words of the memory out of the search."""
+    from pidreams.core.settings import SETTINGS
+
+    words = {w.lower() for w in (SETTINGS.get("treatment") or "").split() if len(w) > 2} | _profile_words
+    if not words:
+        return query.strip()
+    kept = [w for w in query.split() if w.strip(",.;:!?").lower() not in words]
+    cleaned = " ".join(kept)
+    while (shorter := _DANGLING.sub("", cleaned)) != cleaned:
+        cleaned = shorter
+    return re.sub(r"\s*,\s*$", "", cleaned).strip() or query.strip()
 
 
 def _scrape_static(url: str) -> str:
