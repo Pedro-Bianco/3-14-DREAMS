@@ -31,6 +31,18 @@ log = logging.getLogger(__name__)
 # (measured 2026-10-31, CPU); cancel and progress also react sooner.
 _BATCH = 8
 _PREFETCH = 20
+_SMALL_BASE = 10        # fewer pieces than this: DBSF has too few candidates to score (search_hits)
+# Words any question carries: on a small base a piece counts only when it shares a word that says what the
+# question is about ("Qual é a capital da Austrália?" brought a trip plan through "qual" and "é").
+_COMMON = set("""qual quais como onde quando quanto quanta quantos quantas para pela pelo pelos pelas sobre
+esse essa esses essas isso este esta estes estas isto aqui voce voces minha meus minhas tudo todo toda todos
+todas muito muita mais menos ainda depois antes hoje agora fazer pode posso quer quero tenho estou sera seria
+dele dela deles delas nosso nossa porque entao tambem tinha temos vamos fala diga sabe saber coisa coisas
+""".split())
+
+
+def _subject_words(text: str) -> set[str]:
+    return {t for t in terms.tokens(text) if len(t) >= 4 and t not in _COMMON}
 
 
 def doc_id_for(key: str) -> str:
@@ -165,6 +177,16 @@ class KBStore:
         score_min = score_min if score_min is not None else CONFIG.kb_score_min
         try:
             vector = query_vector if query_vector is not None else self._embedder.embed_query(query)
+            if self.count() < _SMALL_BASE:
+                # DBSF scores each piece against the other candidates: with one or two pieces the best
+                # always lands near 1.0, under the gate, and a short document never answered (a two-piece
+                # trip plan, 2026-11-09). On a small base the exact words decide alone.
+                wanted = _subject_words(query)
+                points = [p for p in self._client.query_points(self.COLLECTION, query=terms.sparse(query),
+                                                               using="terms", limit=top_k, with_payload=True).points
+                          if p.payload and wanted & _subject_words(p.payload.get("text", ""))]
+                log.info("[KB] small base: %d piece(s) share words with the question", len(points))
+                return [{**p.payload, "score": p.score} for p in points if p.payload]
             points = self._client.query_points(
                 self.COLLECTION,
                 prefetch=[Prefetch(query=vector, using="dense", limit=_PREFETCH),

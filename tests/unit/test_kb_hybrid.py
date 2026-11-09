@@ -94,7 +94,9 @@ def _base_com_notas(scores):
     store.available, store._embedder = True, _SameVector()
     points = [SimpleNamespace(score=s, payload={"source": f"doc{i}.pdf", "where": "p. 1", "text": f"trecho {i}"})
               for i, s in enumerate(scores)]
-    store._client = SimpleNamespace(query_points=lambda *a, **k: SimpleNamespace(points=points))
+    # A normal base (100 pieces): the DBSF path, scores compared with the other candidates.
+    store._client = SimpleNamespace(query_points=lambda *a, **k: SimpleNamespace(points=points),
+                                    get_collection=lambda *_a: SimpleNamespace(points_count=100))
     return store
 
 
@@ -106,3 +108,14 @@ def test_casamento_forte_manda_todos_e_abaixo_do_limite_nada():
     assert len(_base_com_notas([1.80, 1.30, 1.20, 1.10, 1.00]).search_hits("contrato")) == 5
     assert _base_com_notas([1.10, 1.00]).search_hits("oi") == []
 
+
+
+
+def test_base_pequena_responde_pelas_palavras_do_assunto(base):
+    """Visto em 2026-11-09: com um roteiro curto (2 trechos) a pergunta sobre ele nunca passava do limite."""
+    base.ingest("Hospedagem: o hotel fica em Alfama. O check-in é a partir das 15h.", source_name="Roteiro")
+    base.ingest("Passeios: Sintra no dia 15, trem saindo do Rossio às 9h.", source_name="Passeios")
+    assert "check-in" in base.search_hits("Que horas é o check-in do hotel?")[0]["text"]
+    assert "Sintra" in base.search_hits("Que horas sai o trem para Sintra?")[0]["text"]
+    for unrelated in ("tudo bem?", "Qual é a capital da Austrália?", "Me conta uma piada"):
+        assert base.search_hits(unrelated) == [], unrelated

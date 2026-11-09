@@ -21,6 +21,11 @@
   <a href="../../releases/latest"><img src="https://img.shields.io/badge/⬇%20Baixar%20para%20Windows-0078D4?style=for-the-badge" alt="Baixar para Windows" height="40"></a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/Pedro-Bianco/3-14-DREAMS/releases/download/v1.2.0/PI-dreams-demo.mp4"><img src="docs/demo.jpg" width="720" alt="Vídeo de 2 minutos do PI dreams em uso: conversa por voz, memória, lembretes, documentos, rotinas e o globo do Monitoramento"></a><br>
+  <sub><b>Veja o PI em 2 minutos</b> (com som), num perfil fictício.</sub>
+</p>
+
 ## O que ele faz
 
 - **Conversa por voz e por texto**, em português, com interrupção falando por cima, seis vozes

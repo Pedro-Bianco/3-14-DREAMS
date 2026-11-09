@@ -423,8 +423,10 @@ async def run_agent(
             emit("status", "🎤 Aguardando ser chamado (diga PI, …)" if wake_on else "🎤 Aguardando fala...")
             try:
                 audio = await recorder.record_until_silence(
+                    # Something typed in voice mode is answered at once (and spoken), without waiting for speech.
                     cancel_check=lambda: (mode() != "voice" or muted() or bool(stop_event and stop_event.is_set())
-                                          or research_news() or asleep())
+                                          or research_news() or asleep()
+                                          or (text_input_queue is not None and not text_input_queue.empty()))
                 )
             except Exception as e:
                 log.warning("microphone: %r", e)

@@ -19,6 +19,11 @@
   <a href="../../releases/latest"><img src="https://img.shields.io/badge/⬇%20Download%20for%20Windows-0078D4?style=for-the-badge" alt="Download for Windows" height="40"></a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/Pedro-Bianco/3-14-DREAMS/releases/download/v1.2.0/PI-dreams-demo.mp4"><img src="docs/demo.jpg" width="720" alt="Two-minute video of PI dreams in use: voice chat, memory, reminders, documents, routines and the Monitoring globe"></a><br>
+  <sub><b>See PI in 2 minutes</b> (with sound, in Portuguese), on a fictitious profile.</sub>
+</p>
+
 > The assistant speaks and understands **Brazilian Portuguese only**. Its interface is in Portuguese too.
 
 ## Features
