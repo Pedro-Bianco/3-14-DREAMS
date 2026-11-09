@@ -52,6 +52,10 @@ class AudioPanelMixin:
 
         self._btn_mute = theme.button(toggles, "Mudo", self._toggle_mute, icon="mute")
         self._btn_mute.pack(side=tk.LEFT, padx=(theme.px(16), theme.px(4)))
+        # Answer everything said with the window open, or only speech that starts with "PI, ...".
+        self._btn_wake = theme.button(toggles, "Só com PI", self._toggle_wake_name, icon="name")
+        self._btn_wake.pack(side=tk.LEFT, padx=(0, theme.px(4)))
+        self._refresh_wake_btn()
         # Turns the "camera" service on/off (ver_camera tool). It lives here, and
         # not in the Serviços tab, to be in sight while chatting.
         self._btn_camera = theme.button(toggles, "Câmera", self._toggle_camera, icon="camera")
@@ -84,6 +88,14 @@ class AudioPanelMixin:
     def _toggle_mute(self):
         self._mute_ref[0] = not self._mute_ref[0]
         theme.set_kind(self._btn_mute, "danger" if self._mute_ref[0] else "normal")
+
+    def _toggle_wake_name(self):
+        SETTINGS.set("voice.wake_name", not SETTINGS.get("voice.wake_name"))
+        SETTINGS.save()                  # the settings subscription refreshes the button
+        self._refresh_wake_btn()
+
+    def _refresh_wake_btn(self):
+        theme.set_kind(self._btn_wake, "on" if SETTINGS.get("voice.wake_name") else "normal")
 
     def _toggle_camera(self):
         if str(self._btn_camera.cget("state")) == tk.DISABLED:

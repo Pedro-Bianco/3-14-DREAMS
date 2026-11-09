@@ -30,7 +30,8 @@ SCHEMAS = [
             {"texto": {"type": "string", "description": "O que lembrar."},
              "quando": {"type": "string", "description": (
                  "As palavras de data e hora EXATAMENTE como o usuário falou ('amanhã', 'sexta', 'dia 12 "
-                 "às 15h', 'daqui a 3 dias'). Se ele não disse quando, deixe vazio: não invente.")}},
+                 "às 15h', 'daqui a 3 dias', 'daqui a 10 minutos', 'às 11 e 20'). Se ele não disse quando, "
+                 "deixe vazio: não invente.")}},
             ["texto"]),
     _schema("ver_lembretes", "Lista os lembretes pendentes do usuário. Use quando ele perguntar pelos lembretes.",
             {}, []),

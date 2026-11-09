@@ -1,6 +1,6 @@
 [project]
 name = "pidreams"
-version = "1.0.1"
+version = "1.1.0"
 description = "Local voice assistant for Windows"
 requires-python = ">=3.12,<3.13"
 

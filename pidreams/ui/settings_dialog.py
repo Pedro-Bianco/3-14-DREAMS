@@ -5,6 +5,7 @@ Allowed apps, memory and plugins stay in their own panel tabs — what already h
 a place is not repeated here.
 """
 
+import copy
 import os
 import queue
 import threading
@@ -13,6 +14,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from pidreams.agent.personas import conduct
+from pidreams import routines
 from pidreams.audio import claps, devices, voices
 from pidreams.core import paths
 from pidreams.pc import startup
@@ -52,9 +54,14 @@ class SettingsDialog:
             "tray.idle_minutes": tk.IntVar(value=settings.get("tray.idle_minutes")),
             "tray.claps": tk.BooleanVar(value=settings.get("tray.claps")),
             "tray.clap_level": tk.DoubleVar(value=settings.get("tray.clap_level")),
+            "tray.speak_reminders": tk.BooleanVar(value=settings.get("tray.speak_reminders")),
+            "voice.wake_name": tk.BooleanVar(value=settings.get("voice.wake_name")),
+            "stt.engine": tk.StringVar(value=_STT_LABEL[settings.get("stt.engine")]),
+            "privacy.log_speech": tk.BooleanVar(value=settings.get("privacy.log_speech")),
         }
         for title, build in (("Geral", self._general), ("Áudio e voz", self._audio), ("Bandeja", self._tray),
-                               ("Hardware e modelo", self._hardware), ("Avançado", self._advanced)):
+                               ("Rotinas", self._routines_tab), ("Hardware e modelo", self._hardware),
+                               ("Avançado", self._advanced)):
             tab = tk.Frame(tabs, bg=theme.GLASS, padx=theme.px(18), pady=theme.px(12))
             tabs.add(tab, text=title)
             build(tab)
@@ -124,12 +131,96 @@ class SettingsDialog:
         self._items(tab, self.v["audio.input_device"], [_DEFAULT_DEVICE, *devices.list_items("input")])
         self._label(tab, "Saída de som")
         self._items(tab, self.v["audio.output_device"], [_DEFAULT_DEVICE, *devices.list_items("output")])
+        self._label(tab, "Reconhecimento de voz")
+        self._items(tab, self.v["stt.engine"], list(_STT_LABEL.values()))
         self._label(tab, "Voz")
         self._items(tab, self.v["voice.model"], voices.choices())
         self._label(tab, "Efeito de assistente (presença, brilho metálico e eco curto)")
         self._items(tab, self.v["voice.effect"], list(_EFFECTS_LABEL.values()))
         self._label(tab, "Velocidade da fala (maior = mais devagar)")
         theme.Slider(tab, self.v["voice.length_scale"], 0.5, 2.0).pack(fill=tk.X)
+        theme.check(tab, "Só responder quando eu chamar pelo nome (ex.: \"PI, que horas são?\") — "
+                         "conversas com outras pessoas, TV e ligações ficam sem resposta",
+                    self.v["voice.wake_name"]).pack(anchor="w", pady=(theme.px(10), 0))
+        self._label(tab, "Também liga e desliga pelo botão \"Só com PI\" na janela. Medido: o reconhecimento "
+                         "entende o \"PI\" em cerca de 85% das vezes; um nome de duas sílabas (Geral → Nome do "
+                         "assistente) costuma ser entendido melhor, e os dois passam a chamar.", dim=True)
+
+    def _routines_tab(self, tab):
+        """Routines edited as text, one step per line ("abrir: code"): simpler than a widget per
+        step and easy to copy between routines."""
+        self._routines = copy.deepcopy(self.st.get("routines"))
+        self._routine_shown: int | None = None
+        self._label(tab, "Diga \"modo <nome>\", \"protocolo <nome>\" ou \"rotina <nome>\" para rodar. Um passo por "
+                         "linha, como \"tipo: valor\". Tipos: abrir (programa, arquivo ou site), fechar (pede "
+                         "confirmação), volume (0 a 100), silenciar (sim/nao), musica (pausar, continuar, proxima, "
+                         "anterior), falar (uma frase).", dim=True)
+        body = tk.Frame(tab, bg=theme.GLASS)
+        body.pack(fill=tk.BOTH, expand=True, pady=(theme.px(6), 0))
+        left = tk.Frame(body, bg=theme.GLASS)
+        left.pack(side=tk.LEFT, fill=tk.Y)
+        self._routine_list = tk.Listbox(left, width=18, height=10, bg=theme.INPUT, fg=theme.TEXT, relief=tk.FLAT,
+                                        highlightthickness=0, font=theme.FONT_SMALL, exportselection=False,
+                                        selectbackground=theme.HOVER, selectforeground=theme.TEXT)
+        self._routine_list.pack(fill=tk.Y, expand=True)
+        self._routine_list.bind("<<ListboxSelect>>", lambda _e: self._show_routine())
+        buttons = tk.Frame(left, bg=theme.GLASS)
+        buttons.pack(fill=tk.X, pady=(theme.px(6), 0))
+        theme.button(buttons, "Nova", self._new_routine).pack(side=tk.LEFT)
+        theme.button(buttons, "Apagar", self._delete_routine).pack(side=tk.LEFT, padx=theme.px(6))
+        right = tk.Frame(body, bg=theme.GLASS)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(theme.px(12), 0))
+        tk.Label(right, text="Nome", bg=theme.GLASS, fg=theme.TEXT, font=theme.FONT, anchor="w").pack(fill=tk.X)
+        self._routine_name = tk.StringVar()
+        theme.entry(right, textvariable=self._routine_name).pack(fill=tk.X, ipady=theme.px(4))
+        tk.Label(right, text="Passos", bg=theme.GLASS, fg=theme.TEXT, font=theme.FONT, anchor="w").pack(
+            fill=tk.X, pady=(theme.px(8), 0))
+        self._routine_steps = tk.Text(right, height=10, bg=theme.INPUT, fg=theme.TEXT, insertbackground=theme.TEXT,
+                                      relief=tk.FLAT, font=theme.FONT_SMALL, highlightthickness=0)
+        self._routine_steps.pack(fill=tk.BOTH, expand=True)
+        self._refresh_routine_list(0 if self._routines else None)
+
+    def _refresh_routine_list(self, select: int | None):
+        self._routine_list.delete(0, tk.END)
+        for routine in self._routines:
+            self._routine_list.insert(tk.END, routine["name"] or "(sem nome)")
+        self._routine_shown = None
+        if select is not None:
+            self._routine_list.selection_set(select)
+        self._show_routine()
+
+    def _keep_routine_edits(self):
+        """Writes the name and steps on screen back into the routine being shown."""
+        i = self._routine_shown
+        if i is None or i >= len(self._routines):
+            return
+        steps = []
+        for line in self._routine_steps.get("1.0", tk.END).splitlines():
+            if line.strip():
+                kind, _, value = line.partition(":")
+                steps.append({"type": kind.strip().lower(), "value": value.strip()})
+        self._routines[i] = {"name": self._routine_name.get().strip(), "steps": steps}
+
+    def _show_routine(self):
+        self._keep_routine_edits()
+        picked = self._routine_list.curselection()
+        self._routine_shown = picked[0] if picked else None
+        routine = self._routines[self._routine_shown] if self._routine_shown is not None else {"name": "", "steps": []}
+        self._routine_name.set(routine["name"])
+        self._routine_steps.delete("1.0", tk.END)
+        self._routine_steps.insert("1.0", "\n".join(f"{s['type']}: {s['value']}" for s in routine["steps"]))
+
+    def _new_routine(self):
+        self._keep_routine_edits()
+        self._routines.append({"name": f"nova {len(self._routines) + 1}", "steps": [{"type": "falar", "value": "Pronto."}]})
+        self._refresh_routine_list(len(self._routines) - 1)
+
+    def _delete_routine(self):
+        if self._routine_shown is None:
+            return
+        del self._routines[self._routine_shown]
+        self._routine_shown = None
+        self._refresh_routine_list(0 if self._routines else None)
 
     def _tray(self, tab):
         self._label(tab, "Dormindo na bandeja (ao lado do relógio), o PI fica sem janela e sem o modelo de "
@@ -137,7 +228,9 @@ class SettingsDialog:
         for key, text in (("tray.start_with_windows", "Iniciar junto com o Windows (já na bandeja)"),
                           ("tray.close_to_tray", "Ao fechar a janela, ir para a bandeja em vez de sair"),
                           ("tray.claps", "Ouvir duas palmas para acordar (só o volume do som: nada é gravado "
-                                         "nem transcrito)")):
+                                         "nem transcrito)"),
+                          ("tray.speak_reminders", "Falar os lembretes quando estiver dormindo (desligado: só "
+                                                   "a notificação do Windows)")):
             theme.check(tab, text, self.v[key]).pack(anchor="w", pady=(theme.px(6), 0))
         line = tk.Frame(tab, bg=theme.GLASS)
         line.pack(fill=tk.X, pady=(theme.px(8), 0))
@@ -246,6 +339,10 @@ class SettingsDialog:
         theme.button(line, "Abrir o log", lambda: os.startfile(paths.logs_dir()), icon="log").pack(side=tk.LEFT)
         theme.button(line, "Abrir a pasta de dados", lambda: os.startfile(paths.user_data_dir()),
                      icon="folder").pack(side=tk.LEFT, padx=theme.px(8))
+        theme.check(tab, "Registrar no log o texto do que é dito e respondido (só para investigar um problema)",
+                    self.v["privacy.log_speech"]).pack(anchor="w")
+        self._label(tab, "Desligado, o log guarda só dados técnicos (duração, volume, tempos). O áudio nunca é "
+                         "gravado.", dim=True)
 
     # ── save ───────────────────────────────────────────────────────────────
 
@@ -269,16 +366,23 @@ class SettingsDialog:
                 value = round(value * 20) / 20         # steps of 0.05, like the old slider
             if key == "voice.effect":
                 value = {label: code for code, label in _EFFECTS_LABEL.items()}.get(value, "")
+            if key == "stt.engine":
+                value = {label: code for code, label in _STT_LABEL.items()}.get(value, "auto")
             if (key in ("audio.input_device", "audio.output_device") and value == _DEFAULT_DEVICE) or                (key == "llm.model" and value == _RECOMMENDED):
                 value = None
             new_items[key] = value
         new_items["tray.games"] = [line.strip() for line in self._games.get("1.0", tk.END).splitlines() if line.strip()]
+        self._keep_routine_edits()
+        if problem := routines.problem(self._routines):
+            errors.append(f"rotinas ({problem})")
+        new_items["routines"] = self._routines
         previous_items = {c: self.st.get(c) for c in new_items}
         for key, value in new_items.items():
             try:
                 self.st.set(key, value)
             except ValueError:
-                errors.append(self._LABELS.get(key, key))
+                if key != "routines":                       # its problem is already in the list
+                    errors.append(self._LABELS.get(key, key))
         if errors:
             for key, value in previous_items.items():      # nothing is saved halfway
                 self.st.set(key, value)
@@ -306,10 +410,23 @@ class SettingsDialog:
 
 
     def _needs_voice_download(self) -> bool:
-        """The chosen voice's files are missing (the default comes with the install; the Kokoro voices
-        only when one is chosen): download them, then save."""
+        """The chosen voice's (or recognition's) files are missing (the default comes with the install;
+        the Kokoro voices and the GPU recognition only when chosen): download them, then save."""
         from pidreams.hardware import models
+        from pidreams.stt import openvino_whisper
         from pidreams.ui.download_dialog import DownloadDialog
+
+        if self.v["stt.engine"].get() == _STT_LABEL["turbo"] and not openvino_whisper.present():
+            def recognition_ready(ok: bool, failures: list[str]):
+                if ok:
+                    self.save()
+                else:
+                    self._status.config(text="reconhecimento não baixado: " + "; ".join(failures), fg=theme.DANGER)
+
+            DownloadDialog(self.window, "Reconhecimento de voz — baixando o modelo",
+                           [("Reconhecimento na placa de vídeo (~0,8 GB, uma vez só)", models.download_whisper_turbo)],
+                           on_finish=recognition_ready)
+            return True
 
         if voices.is_kokoro(self.v["voice.model"].get()):
             present, label, download = models.kokoro_present(), "Vozes Kokoro (~340 MB, uma vez só)", models.download_kokoro
@@ -330,6 +447,9 @@ class SettingsDialog:
 
 
 _RECOMMENDED = "Recomendado para este PC"
+_STT_LABEL = {"auto": "Recomendado para este PC",
+              "small": "Rápido no processador (Whisper small)",
+              "turbo": "Mais preciso na placa de vídeo Intel (Whisper large-v3-turbo)"}
 _CALIBRATION_PAIRS = 3
 _CALIBRATION_S = 30
 _EFFECTS_LABEL = {"": "Desligado", "leve": "Leve", "medio": "Médio", "forte": "Forte"}

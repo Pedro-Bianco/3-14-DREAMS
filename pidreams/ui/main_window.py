@@ -814,6 +814,12 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         elif etype == "claps":
             self._set_claps(data)
 
+        elif etype == "reminder_asleep":
+            # Asleep there is no window to show it: a Windows notification from the tray icon.
+            if not (self._tray and self._tray.notify("PI dreams — lembrete", data)):
+                log.warning("reminder notification could not be shown; left in the chat for the next opening")
+                self._chat_insert(f"\n  ⏰ {data}\n", "info")
+
         elif etype == "stopped":
             self._show_status("Encerrado", theme.MUTED)
             self._sphere_state("idle")
@@ -831,6 +837,7 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         self._mic_device_ref[0] = devices.index(st.get("audio.input_device"), "input")
         self._out_device_ref[0] = devices.index(st.get("audio.output_device"), "output")
         self._volume_ref[0] = st.get("audio.volume")
+        self._refresh_wake_btn()             # changed in the settings screen
         # The audio panel selectors follow the settings screen.
         for var, mapping, key in ((self._mic_var, self._input_device_map, "audio.input_device"),
                                  (self._out_var, self._output_device_map, "audio.output_device")):

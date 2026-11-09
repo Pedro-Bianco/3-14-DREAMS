@@ -33,9 +33,22 @@ def _r(text, **kw):
     ("amanhã às 3 da tarde", dt.date(2026, 10, 31), dt.time(15)),
     ("às 15h", dt.date(2026, 10, 30), dt.time(15)),                # só a hora: hoje, se não passou
     ("às 9h", dt.date(2026, 10, 31), dt.time(9)),                  # já passou: amanhã
+    # Vistos no app em 2026-11-09: o modelo passa as palavras como foram ditas.
+    ("dois minutos", dt.date(2026, 10, 30), dt.time(10, 2)),
+    ("daqui a 2 minutos", dt.date(2026, 10, 30), dt.time(10, 2)),
+    ("em meia hora", dt.date(2026, 10, 30), dt.time(10, 30)),
+    ("daqui a uma hora", dt.date(2026, 10, 30), dt.time(11)),
+    ("11 e 21", dt.date(2026, 10, 30), dt.time(11, 21)),
+    ("às 15 e 45", dt.date(2026, 10, 30), dt.time(15, 45)),
+    ("às 3 horas da tarde", dt.date(2026, 10, 30), dt.time(15)),   # hora do relógio, não "daqui a 3 h"
 ])
 def test_formatos_falados(text, data, hour):
     assert _r(text) == (data, hour)
+
+
+def test_daqui_a_minutos_nunca_dispara_antes():
+    with_seconds = dt.datetime(2026, 10, 30, 10, 0, 40)
+    assert resolve_when("daqui a 2 minutos", with_seconds) == (dt.date(2026, 10, 30), dt.time(10, 3))
 
 
 def test_agenda_conta_hoje_e_aceita_passado():

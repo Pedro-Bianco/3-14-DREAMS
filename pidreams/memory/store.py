@@ -10,6 +10,7 @@ from qdrant_client.models import (
 )
 
 from pidreams.core.config import CONFIG
+from pidreams.core.logging_setup import said
 from pidreams.memory.embedder import FastEmbedManager
 
 log = logging.getLogger(__name__)
@@ -238,7 +239,7 @@ class LTMStore:
             vec = self._embedder.embed_text(text)
             dupes = self._query_points(vec, top_k=1, score_min=dedup_threshold)
             if dupes:
-                log.info(f"[LTM] Duplicate ignored ({dupes[0].score:.2f}): {text[:60]}")
+                log.info(f"[LTM] Duplicate ignored ({dupes[0].score:.2f}): {said(text[:60])}")
                 return False
             self._client.upsert(
                 collection_name=self.COLLECTION,

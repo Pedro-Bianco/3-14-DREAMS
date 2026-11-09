@@ -143,6 +143,21 @@ def download_whisper(progress: Progress, cancel: threading.Event) -> None:
                        progress, cancel)
 
 
+def download_whisper_turbo(progress: Progress, cancel: threading.Event) -> None:
+    """Whisper large-v3-turbo for Intel GPUs (stt/openvino_whisper.py), from Intel's own repository."""
+    from huggingface_hub import snapshot_download
+
+    from pidreams.stt import openvino_whisper
+
+    if openvino_whisper.present():
+        progress(100, "Reconhecimento na placa já instalado")
+        return
+    folder = openvino_whisper.model_folder()
+    _download_with_wait("Reconhecimento na placa", openvino_whisper.MODEL_SIZE, folder,
+                       lambda: snapshot_download(openvino_whisper.MODEL_ID, local_dir=str(folder)),
+                       progress, cancel)
+
+
 def download_embeddings(progress: Progress, cancel: threading.Event) -> None:
     from pidreams.memory.embedder import FastEmbedManager
 
@@ -243,11 +258,18 @@ def download_pocket(progress: Progress, cancel: threading.Event) -> None:
 # ── Conjuntos ─────────────────────────────────────────────────────────────────
 
 def essentials() -> list[tuple[str, Callable[[Progress, threading.Event], None]]]:
-    """What the install downloads: chatting by voice needs these four. The deep research's stronger
+    """What the install downloads: chatting by voice needs these four (five with an Intel GPU: the
+    recognition that runs on it). The deep research's stronger
     model is optional (Configurações → Hardware)."""
-    return [
+    from pidreams.hardware.detect import current_profile
+    from pidreams.stt import openvino_whisper
+
+    items = [
         (f"Modelo de conversa ({CONFIG.ollama_model})", lambda p, c: download_ollama(CONFIG.ollama_model, p, c)),
         ("Reconhecimento de voz (Whisper)", download_whisper),
         ("Memória (embeddings)", download_embeddings),
         ("Voz (~210 MB)", download_pocket),
     ]
+    if openvino_whisper.intel_gpu(current_profile().gpu_name):        # faster and more accurate there
+        items.insert(2, ("Reconhecimento na placa de vídeo (~0,8 GB)", download_whisper_turbo))
+    return items

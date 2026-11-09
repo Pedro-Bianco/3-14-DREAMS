@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 from typing import Any, Callable
 
+from pidreams import routines
 from pidreams.core import paths
 
 log = logging.getLogger(__name__)
@@ -25,7 +26,8 @@ DEFAULTS: dict[str, Any] = {
     "persona_id": "espirituoso",
     "appearance": "rosto",       # id from pidreams/ui/appearances (unknown = rosto)
     "audio": {"input_device": None, "output_device": None, "volume": 1.0},
-    "voice": {"model": "pocket-baritono", "length_scale": 1.0, "effect": "forte"},   # effect: "" = off
+    # effect: "" = off. wake_name: in voice mode, answer only speech that starts with the name.
+    "voice": {"model": "pocket-baritono", "length_scale": 1.0, "effect": "forte", "wake_name": False},
     "weather": {"city": ""},
     "llm": {"model": None},
     "ollama": {"host": "http://127.0.0.1:11434", "timeout_s": 600.0},
@@ -45,7 +47,14 @@ DEFAULTS: dict[str, Any] = {
     # Tray: sleep in the notification area instead of closing, wake on two claps, start with
     # Windows; games = executable names that close the app completely when running.
     "tray": {"start_with_windows": False, "close_to_tray": False, "idle_minutes": 10,
-             "claps": True, "clap_level": 0.2, "games": []},   # clap_level: from calibrating
+             "claps": True, "clap_level": 0.2, "games": [],     # clap_level: from calibrating
+             "speak_reminders": True},                           # asleep: speak reminders, not only notify
+    # log_speech: write what is said (and answered) to the log, for troubleshooting only.
+    "privacy": {"log_speech": False},
+    # Speech recognition: "auto" (turbo on an Intel GPU when downloaded, else small), "small", "turbo".
+    "stt": {"engine": "auto"},
+    # Routines ("protocolos"): pidreams/routines.py; starts with generic examples.
+    "routines": copy.deepcopy(routines.EXAMPLES),
 }
 
 # Accepted ranges; everything else only needs the default's type.
@@ -58,7 +67,7 @@ _RANGES = {
 }
 _LENGTHS = {"assistant_name": (1, 40), "treatment": (0, 40)}
 # Fields that take one of a fixed set of values.
-_CHOICES = {"voice.effect": {"", "leve", "medio", "forte"}}
+_CHOICES = {"voice.effect": {"", "leve", "medio", "forte"}, "stt.engine": {"auto", "small", "turbo"}}
 # Fields whose default is None but that accept text.
 _TEXT_OR_NULL = {"audio.input_device", "audio.output_device", "llm.model"}
 # Free-form dictionaries (keys defined by the user or by plugins).
@@ -82,7 +91,9 @@ def _valid(key: str, value: Any, default: Any) -> bool:
         ok = lo <= len(value) <= hi
     if ok and key in _CHOICES:
         ok = value in _CHOICES[key]
-    if ok and isinstance(default, list):
+    if ok and key == "routines":
+        ok = all(isinstance(item, dict) for item in value) and routines.problem(value) is None
+    elif ok and isinstance(default, list):
         ok = all(isinstance(item, str) for item in value)
     return ok
 

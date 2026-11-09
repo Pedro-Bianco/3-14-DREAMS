@@ -21,6 +21,7 @@ compatível com a GPL-3.0.
 | [espeakng-loader](https://github.com/thewh1teagle/espeakng-loader) + eSpeak NG | Pronúncia das vozes | MIT (o eSpeak NG embutido é GPL-3.0) |
 | [phonemizer](https://github.com/bootphon/phonemizer) | Pronúncia das vozes | GPL-3.0-or-later |
 | [faster-whisper](https://github.com/SYSTRAN/faster-whisper), [CTranslate2](https://github.com/OpenNMT/CTranslate2) | Reconhecimento de voz | MIT |
+| [OpenVINO](https://github.com/openvinotoolkit/openvino), [OpenVINO GenAI](https://github.com/openvinotoolkit/openvino.genai), [OpenVINO Tokenizers](https://github.com/openvinotoolkit/openvino_tokenizers) (Intel) | Reconhecimento de voz na placa de vídeo Intel | Apache-2.0 (`LICENSES/Apache-2.0.txt`) |
 | [ONNX Runtime](https://github.com/microsoft/onnxruntime) | Execução de modelos (voz, memória) | MIT |
 | [Ollama Python](https://github.com/ollama/ollama-python) | Cliente do Ollama | MIT |
 | [qdrant-client](https://github.com/qdrant/qdrant-client) | Memória vetorial local | Apache-2.0 |
@@ -69,7 +70,10 @@ compatível com a GPL-3.0.
 Cada um sob a licença do autor, que você aceita ao baixar:
 [Ollama](https://github.com/ollama/ollama) (MIT); modelos de conversa **Qwen3 4B Instruct**, **Qwen3 8B**
 e **Qwen 2.5 14B** e o de visão **Qwen3-VL 2B** (todos Apache-2.0, via Ollama), escolhidos pelo
-hardware; **Whisper** small (MIT, versão CTranslate2 da Systran);
+hardware; **Whisper** small (MIT, versão CTranslate2 da Systran); em PCs com placa de vídeo Intel,
+**Whisper large-v3-turbo** (MIT, OpenAI) na versão OpenVINO publicada pela Intel
+([OpenVINO/whisper-large-v3-turbo-int8-ov](https://huggingface.co/OpenVINO/whisper-large-v3-turbo-int8-ov),
+Apache-2.0; ~0,8 GB);
 **multilingual-e5-large** (MIT, versão ONNX da Qdrant); e a voz: o modelo português do
 **Pocket TTS** da Kyutai, na versão pública sem clonagem de voz
 ([kyutai/pocket-tts-without-voice-cloning](https://huggingface.co/kyutai/pocket-tts-without-voice-cloning),

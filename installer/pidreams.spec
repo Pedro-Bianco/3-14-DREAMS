@@ -40,6 +40,15 @@ hiddenimports += collect_submodules("tiktoken_ext")
 hiddenimports += collect_submodules("scipy._external.array_api_compat")
 hiddenimports += collect_submodules("kokoro_onnx") + collect_submodules("phonemizer")   # imported lazily
 hiddenimports += ["sounddevice", "PIL.ImageTk", "miniaudio", "sgp4.api", "sgp4.omm"]
+# Speech recognition on Intel GPUs (OpenVINO, stt/openvino_whisper.py). Only what it runs is kept (see
+# _OPENVINO_UNUSED): the full wheels are ~250 MB, mostly the NPU compiler and model-format readers.
+binaries += collect_dynamic_libs("openvino") + collect_dynamic_libs("openvino_genai")
+binaries += collect_dynamic_libs("openvino_tokenizers")
+datas += collect_data_files("openvino", includes=["libs/*.json"])
+hiddenimports += ["openvino", "openvino_genai", "openvino_tokenizers"]
+_OPENVINO_UNUSED = ("openvino_intel_npu", "_frontend.dll", "openvino_auto_batch_plugin", "openvino_hetero_plugin",
+                    "openvino_auto_plugin", "tbbmalloc_proxy")
+_OPENVINO_KEPT = ("openvino_ir_frontend.dll",)        # the reader of the model files themselves
 
 a = Analysis(
     [str(ROOT / "installer" / "launcher.py")],
@@ -49,9 +58,14 @@ a = Analysis(
     hiddenimports=hiddenimports,
     # PyTorch is needed by the default voice (pocket-tts). starlette and uvicorn stay: the MCP library
     # imports them on start (leaving them out made v0.9.0 and v0.9.1 fail to open).
-    excludes=["matplotlib", "IPython", "jupyter", "pytest", "tensorflow", "torchvision", "torchaudio", "fastapi"],
+    # openvino_telemetry: OpenVINO's usage statistics, not needed to run (checked on 2026-11-09).
+    excludes=["matplotlib", "IPython", "jupyter", "pytest", "tensorflow", "torchvision", "torchaudio", "fastapi",
+              "openvino_telemetry", "openvino.tools", "openvino.frontend.tensorflow", "openvino.frontend.pytorch",
+              "openvino.frontend.onnx", "openvino.frontend.paddle", "openvino.frontend.jax"],
     noarchive=False,
 )
+a.binaries = [b for b in a.binaries
+              if b[0].endswith(_OPENVINO_KEPT) or not any(part in b[0] for part in _OPENVINO_UNUSED)]
 pyz = PYZ(a.pure)
 exe = EXE(
     pyz,

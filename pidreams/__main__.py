@@ -68,6 +68,15 @@ def check_imports() -> int:
         importlib.import_module("OpenGL.GL")
     except Exception as e:                        # noqa: BLE001
         failures.append(f"OpenGL.GL: {type(e).__name__}: {e}")
+    # Speech recognition on an Intel GPU: the packaged OpenVINO keeps only some of its libraries, so it
+    # is loaded for real when the model is on this PC.
+    from pidreams.stt import openvino_whisper
+    if openvino_whisper.present():
+        try:
+            import numpy as np
+            openvino_whisper.OpenVinoWhisper().transcribe(np.zeros(16000, dtype=np.float32))
+        except Exception as e:                    # noqa: BLE001
+            failures.append(f"openvino whisper: {type(e).__name__}: {e}")
     from pidreams.hardware import models
     if models.pocket_present():
         try:

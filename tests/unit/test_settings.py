@@ -45,3 +45,15 @@ def test_salvar_e_atomico_e_avisa_os_ouvintes(tmp_path):
     assert seen == ["Curitiba"]
     assert not path.with_suffix(".json.tmp").exists()
     assert Settings(path).get("weather.city") == "Curitiba"
+
+
+def test_o_log_nao_guarda_o_que_foi_dito_por_padrao(tmp_path, monkeypatch):
+    """Até 2026-11-09 o log guardava toda transcrição, inclusive de outras pessoas na sala."""
+    from pidreams.core import logging_setup, settings
+
+    s = Settings(tmp_path / "settings.json")
+    monkeypatch.setattr(settings, "SETTINGS", s)
+    assert s.get("privacy.log_speech") is False
+    assert logging_setup.said("me lembra de pagar a conta") == "[texto oculto]"
+    s.set("privacy.log_speech", True)
+    assert logging_setup.said("me lembra de pagar a conta") == "me lembra de pagar a conta"

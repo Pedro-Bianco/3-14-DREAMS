@@ -17,6 +17,7 @@ AUDIO = np.zeros(16000, np.float32)
 
 def _transcriber(segments):
     t = Transcriber.__new__(Transcriber)   # sem carregar o modelo
+    t.engine = "small"
     info = SimpleNamespace(duration=1.0, duration_after_vad=1.0)
     t.model = SimpleNamespace(transcribe=lambda *_a, **_kw: (iter(segments), info))
     return t

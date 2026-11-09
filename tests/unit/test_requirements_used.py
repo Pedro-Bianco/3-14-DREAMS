@@ -21,6 +21,8 @@ INDIRECT = {
     "torch": "motor do pocket-tts (voz padrão); fixado na versão para CPU testada",
     "tiktoken": "usado pelo TokenTextSplitter do langchain (modo 'token' da aba KB)",
     "tzdata": "dados de fuso que o zoneinfo lê no Windows (agenda); não tem import",
+    "openvino": "motor do openvino-genai (reconhecimento na placa Intel); fixado na versão medida",
+    "openvino-tokenizers": "extensão que o openvino-genai carrega para o texto do Whisper; mesma versão",
 }
 
 

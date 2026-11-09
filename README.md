@@ -49,6 +49,9 @@
   citações, que fica guardado na Base.
 - **[Bandeja e palmas](#bandeja-e-palmas)**: dorme ao lado do relógio sem ocupar a placa de vídeo,
   acorda com duas palmas ou um clique, pode iniciar com o Windows e fecha sozinho quando um jogo abre.
+- **[Rotinas e chamada pelo nome](#rotinas-e-chamada-pelo-nome)**: sequências de ações com uma frase
+  ("modo trabalho"), opção de só responder quando chamado ("PI, …") e lembretes avisados mesmo com o PI
+  dormindo.
 - **[Monitoramento](#monitoramento)**: um globo 3D que gira com o mouse, com os mais de 16 mil
   satélites em órbita em tempo real, terremotos do dia, rádios do mundo e aviões ao vivo com rastros. Clique num país ou
   pergunte ("o que está acontecendo no Japão?") e um agente próprio resume as notícias de lá
@@ -256,6 +259,20 @@ Em **Configurações → Bandeja**, o PI pode dormir ao lado do relógio em vez 
   programas nem capturar teclado ou mouse); jogos em janela sem borda entram numa lista sua de
   executáveis. Depois do jogo, abra o PI de novo (ou ele volta no próximo início do Windows).
 
+## Rotinas e chamada pelo nome
+
+- **Rotinas ("protocolos")**: em **Configurações → Rotinas**, monte uma sequência de passos — abrir
+  um programa ou site, fechar um programa (com confirmação), volume, silenciar, música, falar uma
+  frase — e rode dizendo "modo trabalho", "protocolo foco" ou "rotina <nome>". Se um passo falhar, os
+  outros continuam e o PI diz no fim o que não deu. Vem com "trabalho" e "foco" de exemplo.
+- **Só com PI**: o botão ao lado de Voz/Texto/Mudo faz o PI responder só às falas que começam com o
+  nome dele ("PI, que horas são?") — conversas com outras pessoas, TV e ligações ficam sem resposta e
+  não vão para a memória. Medido com falas reais: ignorou 100% das conversas que não eram para ele e
+  entendeu o "PI" em ~85% das chamadas; um nome de duas sílabas (Configurações → Geral) costuma ir
+  melhor, e os dois passam a chamar.
+- **Lembretes com o PI dormindo**: na hora certa ele fala o lembrete e mostra uma notificação do
+  Windows, sem abrir a janela; clicar nela abre o PI. Dá para deixar só a notificação.
+
 ## Experimente dizer
 
 | Você diz | O que acontece |
@@ -266,6 +283,8 @@ Em **Configurações → Bandeja**, o PI pode dormir ao lado do relógio em vez 
 | "Pesquisa a fundo sobre baterias de sódio" | Abre a Pesquisa profunda e escreve o relatório |
 | "Abre o monitoramento" | Troca a aparência pelo globo com satélites, terremotos e rádios |
 | "Me lembra de pagar a conta na sexta" | Cria o lembrete e avisa no dia |
+| "Me lembra de tirar o bolo daqui a 40 minutos" | Avisa na hora, mesmo com o PI dormindo na bandeja |
+| "Modo trabalho" | Roda a rotina "trabalho" e diz o que fez |
 | "O que eu tenho amanhã?" | Lê os compromissos da sua agenda |
 | "Tenho e-mail novo do banco?" | Procura no Gmail e resume |
 | "Procura o contrato na pasta Documentos" | Encontra e lê o arquivo nas pastas liberadas |
@@ -344,7 +363,10 @@ Os modelos são baixados durante a instalação, cada um sob a licença do seu a
 | Placa de vídeo com 6 a 16 GB | Qwen3 8B |
 | Placa de vídeo com 16 GB ou mais | Qwen 2.5 14B |
 
-Além dele: o Whisper (reconhecimento de voz), o `multilingual-e5-large` (memória e Base) e, ao
+Além dele: o Whisper para o reconhecimento de voz — o **large-v3-turbo na placa de vídeo** em PCs
+com placa Intel (Arc ou integrada, pelo [OpenVINO](https://github.com/openvinotoolkit/openvino.genai)) e o
+**small no processador** nos demais (ou na placa NVIDIA), escolha automática ou em Configurações → Áudio
+e voz —, o `multilingual-e5-large` (memória e Base) e, ao
 ligar a câmera pela primeira vez, o Qwen3-VL 2B (visão). Todos os modelos de conversa e de visão são Apache-2.0.
 
 A voz padrão, um barítono formal, roda no [Pocket TTS](https://github.com/kyutai-labs/pocket-tts) da Kyutai
@@ -366,7 +388,7 @@ modelo de conversa.
 O PI dreams não espera a resposta inteira ficar pronta para começar a falar:
 
 1. **Fim da fala**: 1,2 s de silêncio encerram a sua vez.
-2. **Transcrição**: o Whisper transcreve a frase inteira de uma vez, no processador.
+2. **Transcrição**: o Whisper transcreve a frase inteira de uma vez — na placa de vídeo Intel, quando há.
 3. **Memória e Base**: as lembranças e os documentos relacionados são buscados.
 4. **Modelo de conversa em streaming**: a resposta chega do Ollama pedaço por pedaço, e cada frase vai
    para a voz assim que termina, enquanto o modelo continua escrevendo as próximas.
@@ -380,11 +402,11 @@ placa de vídeo de 12 GB (Intel Arc B580) e a voz padrão:
 | Etapa | Tempo medido |
 |---|---|
 | Silêncio que encerra a sua vez | 1,2 s |
-| Transcrição (Whisper small, processador) | 1,2 a 1,6 s |
+| Transcrição (Whisper large-v3-turbo na placa Intel) | 0,1 a 0,2 s (no processador, com o small: 1,2 a 1,6 s) |
 | Memória e Base de documentos | 0,1 a 0,3 s |
 | Primeira frase do modelo de conversa | 0,5 a 0,8 s em conversa; 2 a 3 s quando usa uma ferramenta (notícias, voos, busca) |
 | Voz até começar a tocar | 0,11 a 0,20 s |
-| **Total, do fim do silêncio até ouvir a resposta** | **2,0 a 4,3 s** |
+| **Total, do fim do silêncio até ouvir a resposta** | **0,9 a 3,0 s** |
 
 Antes dessas otimizações, o mesmo PC levava de 8 a 12 s. O que mais pesou:
 
@@ -394,6 +416,7 @@ Antes dessas otimizações, o mesmo PC levava de 8 a 12 s. O que mais pesou:
 | Resposta | esperava o texto inteiro | streaming: fala a 1ª frase enquanto escreve o resto |
 | Trechos da Base em conversa casual | 5 trechos (+1.800 tokens), 1ª frase em 5 a 9 s | 2 trechos quando o casamento é fraco |
 | Silêncio que encerra a vez | 1,8 s | 1,2 s |
+| Reconhecimento de voz (placa Intel) | Whisper small no processador: 1,2 a 1,6 s | large-v3-turbo na placa: 0,1 a 0,2 s, e erra menos com barulho de fundo (88% × 80% das palavras) |
 | Transcrição | 4 núcleos: 1,56 s por frase | um por núcleo físico: ~1,35 s |
 | Voz até tocar | 0,4 a 1,8 s (frase inteira gerada antes) | 0,11 a 0,20 s (streaming) |
 

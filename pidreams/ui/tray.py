@@ -30,7 +30,8 @@ _WM_APP_TRAY = 0x8001                    # WM_APP + 1
 _WM_NULL, _WM_LBUTTONUP, _WM_RBUTTONUP = 0x0000, 0x0202, 0x0205
 _HWND_MESSAGE = wt.HWND(-3)
 _NIM_ADD, _NIM_MODIFY, _NIM_DELETE = 0, 1, 2
-_NIF_MESSAGE, _NIF_ICON, _NIF_TIP = 0x1, 0x2, 0x4
+_NIF_MESSAGE, _NIF_ICON, _NIF_TIP, _NIF_INFO = 0x1, 0x2, 0x4, 0x10
+_NIIF_USER, _NIN_BALLOONUSERCLICK = 0x4, 0x0405      # balloon with the app's own icon; click on it
 _MF_STRING, _MF_CHECKED, _MF_SEPARATOR = 0x0, 0x8, 0x800
 _TPM_RIGHTBUTTON, _TPM_RETURNCMD, _TPM_NONOTIFY = 0x2, 0x100, 0x80
 _IMAGE_ICON, _LR_LOADFROMFILE, _LR_DEFAULTSIZE = 1, 0x10, 0x40
@@ -153,6 +154,17 @@ class TrayIcon:
             if not self._shown:
                 log.warning("tray icon could not be added")
 
+    def notify(self, title: str, text: str) -> bool:
+        """A Windows notification from the icon (Windows 10/11 show it as a toast). Only while
+        the icon is shown; False when it could not be shown."""
+        if not self._shown:
+            return False
+        data = self._data()
+        data.uFlags |= _NIF_INFO
+        data.szInfoTitle, data.szInfo = title[:63], text[:255]
+        data.dwInfoFlags = _NIIF_USER
+        return bool(_shell32.Shell_NotifyIconW(_NIM_MODIFY, ctypes.byref(data)))
+
     def hide(self) -> None:
         if self._shown:
             _shell32.Shell_NotifyIconW(_NIM_DELETE, ctypes.byref(self._data()))
@@ -188,7 +200,7 @@ class TrayIcon:
     def _window_proc(self, hwnd, message, wparam, lparam):
         try:
             if message == _WM_APP_TRAY:
-                if lparam == _WM_LBUTTONUP:
+                if lparam in (_WM_LBUTTONUP, _NIN_BALLOONUSERCLICK):
                     self._on_wake()
                 elif lparam == _WM_RBUTTONUP:
                     self._menu()

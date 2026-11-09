@@ -6,6 +6,7 @@ import time
 import ollama
 
 from pidreams.core.config import CONFIG
+from pidreams.core.logging_setup import said
 from pidreams.memory import topics
 from pidreams.memory.store import LTMStore
 from pidreams.memory.updater import classify_relation
@@ -240,7 +241,7 @@ class MemoryWorker:
             keep_alive=CONFIG.ollama_keep_alive,
         )
         raw = resp.message.content.strip()
-        log.info(f"[LTM] Model returned: {raw[:200]!r}")
+        log.info(f"[LTM] Model returned: {said(repr(raw[:200]))}")
         facts = parse_facts(raw)
         if not facts:
             log.info("[LTM] Nothing relevant — dropped")
@@ -251,7 +252,7 @@ class MemoryWorker:
                 continue
             stored = self._smart_upsert(fact, kind)
             if stored:
-                log.info(f"[LTM] Stored: {fact[:70]}")
+                log.info(f"[LTM] Stored: {said(fact[:70])}")
                 if self._on_store:
                     try:
                         self._on_store(fact)
@@ -281,7 +282,7 @@ class MemoryWorker:
 
         # Duplicate zone — upsert would block it anyway, but we get ahead of it
         if any(c["score"] >= 0.96 for c in candidates):
-            log.warning(f"[LTM] Early duplicate — dropped: {fact[:60]}")
+            log.warning(f"[LTM] Early duplicate — dropped: {said(fact[:60])}")
             return False
 
         # Update zone — asks the LLM to classify

@@ -6,6 +6,9 @@ import numpy as np
 from faster_whisper import WhisperModel
 from pidreams.core import paths
 from pidreams.core.config import CONFIG
+from pidreams.core.logging_setup import said
+from pidreams.core.settings import SETTINGS
+from pidreams.stt import openvino_whisper
 
 log = logging.getLogger(__name__)
 
@@ -59,13 +62,53 @@ def _device() -> tuple[str, str]:
     return CONFIG.whisper_device, CONFIG.whisper_compute_type
 
 
+def wanted_engine() -> str:
+    """"turbo" (large-v3-turbo on an Intel GPU, stt/openvino_whisper.py) or "small" (faster-whisper,
+    CPU or NVIDIA). "auto" picks the turbo when there is an Intel GPU and its model is downloaded."""
+    from pidreams.hardware.detect import current_profile
+
+    choice = SETTINGS.get("stt.engine")
+    if choice == "small" or not openvino_whisper.present():
+        return "small"
+    return "turbo" if choice == "turbo" or openvino_whisper.intel_gpu(current_profile().gpu_name) else "small"
+
+
 class Transcriber:
     """
-    Transcribes audio with faster-whisper (CTranslate2).
-    Supports int8/float16 quantization, much faster than openai-whisper.
+    Transcribes audio with the engine for this PC: Whisper large-v3-turbo on an Intel GPU, or
+    faster-whisper "small" (CPU int8, or NVIDIA). sync() follows a change in the settings.
+    notice: why the GPU engine could not be used (shown once by the caller), or "".
     """
 
     def __init__(self):
+        self.model = None
+        self._turbo: openvino_whisper.OpenVinoWhisper | None = None
+        self.engine = ""
+        self.notice = ""
+        self.sync()
+
+    def sync(self) -> None:
+        """Loads the engine the settings and the hardware ask for, if it is not the one loaded."""
+        wanted = wanted_engine()
+        if wanted == self.engine:
+            return
+        if wanted == "turbo":
+            try:
+                log.info("[STT] Loading Whisper large-v3-turbo on the Intel GPU (OpenVINO)...")
+                self._turbo = openvino_whisper.OpenVinoWhisper()
+                self.model, self.engine = None, "turbo"          # small leaves the RAM
+                log.info("[STT] Model loaded.")
+                return
+            except Exception as e:                               # noqa: BLE001 — driver, memory, missing files
+                log.warning("[STT] GPU engine unavailable, using the CPU: %r", e)
+                self.notice = ("O reconhecimento de voz na placa de vídeo não carregou; usando o processador. "
+                               "Atualizar o driver da placa costuma resolver.")
+        self._turbo = None
+        self._load_small()
+
+    def _load_small(self) -> None:
+        if self.engine == "small":
+            return
         device, compute = _device()
         log.info(f"[STT] Loading Whisper '{CONFIG.whisper_model_size}' "
                  f"(device={device}, compute={compute})...")
@@ -78,15 +121,21 @@ class Transcriber:
             cpu_threads=max(4, (os.cpu_count() or 8) // 2),
             download_root=str(paths.models_dir("whisper")),
         )
+        self.engine = "small"
         log.info("[STT] Model loaded.")
 
-    def transcribe(self, audio: np.ndarray) -> str:
+    def transcribe(self, audio: np.ndarray, hotwords: str | None = None) -> str:
         """
         Transcribes a float32 16 kHz mono audio array.
         Returns the transcribed text, or an empty string if nothing was detected.
+        hotwords: words to expect (the assistant's name while "Só com PI" is on: without it,
+        Whisper wrote "PI" as "Big", "Ih" or "E" in the app). Used by "small" only.
         """
+        if self.engine == "turbo":
+            return self._transcribe_turbo(audio)
         segments, info = self.model.transcribe(
             audio,
+            hotwords=hotwords,
             language=CONFIG.whisper_language,
             beam_size=5,
             no_speech_threshold=0.6,
@@ -106,13 +155,13 @@ class Transcriber:
             # Whisper's own heuristics for "this was not speech":
             # probably silence AND low confidence, or text that repeats itself.
             if seg.no_speech_prob > 0.6 and seg.avg_logprob < -0.7:
-                log.warning(f"[STT] dropped (no speech): {text!r}")
+                log.warning(f"[STT] dropped (no speech): {said(repr(text))}")
                 continue
             if seg.compression_ratio > 2.4:
-                log.warning(f"[STT] dropped (repetitive): {text!r}")
+                log.warning(f"[STT] dropped (repetitive): {said(repr(text))}")
                 continue
             if _ghost(text):
-                log.warning(f"[STT] dropped (ghost phrase): {text!r}")
+                log.warning(f"[STT] dropped (ghost phrase): {said(repr(text))}")
                 continue
             parts.append(text)
         result = " ".join(parts).strip()
@@ -121,5 +170,21 @@ class Transcriber:
         log.info("[STT] audio %.1fs, rms %.4f, peak %.3f, speech detected %.1fs → %s",
                  info.duration, float(np.sqrt(np.mean(audio ** 2))) if len(audio) else 0.0,
                  float(np.abs(audio).max()) if len(audio) else 0.0,
-                 info.duration_after_vad, repr(result[:60]) if result else "(empty)")
+                 info.duration_after_vad, said(repr(result[:60])) if result else "(empty)")
         return result
+
+    def _transcribe_turbo(self, audio: np.ndarray) -> str:
+        from faster_whisper.vad import VadOptions, collect_chunks, get_speech_timestamps
+
+        # The same voice filter "small" uses: over silence the turbo writes "E aí" or "Obrigado".
+        voiced = get_speech_timestamps(audio, VadOptions(min_silence_duration_ms=500, speech_pad_ms=300))
+        speech = np.concatenate(collect_chunks(audio, voiced)[0]) if voiced else np.array([], dtype=np.float32)
+        text = self._turbo.transcribe(speech) if len(speech) else ""
+        if _ghost(text):
+            log.warning(f"[STT] dropped (ghost phrase): {said(repr(text))}")
+            text = ""
+        log.info("[STT] audio %.1fs, rms %.4f, peak %.3f, speech detected %.1fs → %s",
+                 len(audio) / 16000, float(np.sqrt(np.mean(audio ** 2))) if len(audio) else 0.0,
+                 float(np.abs(audio).max()) if len(audio) else 0.0, len(speech) / 16000,
+                 said(repr(text[:60])) if text else "(empty)")
+        return text

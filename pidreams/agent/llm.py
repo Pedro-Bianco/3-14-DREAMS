@@ -9,6 +9,7 @@ import ollama
 from pidreams.agent.tools import active_tool_schemas, dispatch_tool
 from pidreams.agent.personas.conduct import build_prompt
 from pidreams.core.config import CONFIG
+from pidreams.core.logging_setup import said
 from pidreams.core.settings import SETTINGS
 
 log = logging.getLogger(__name__)
@@ -298,7 +299,7 @@ class LLMAgent:
                 # Asked the same thing twice, the monitor's agent answered in Thai (app test,
                 # 2026-11-02); with an overflowing context the main one answered in Chinese.
                 # One more try with the order right next to the request; it is never spoken.
-                log.warning(f"[Reply in another script, retrying: {reply[:80]!r}]")
+                log.warning(f"[Reply in another script, retrying: {said(repr(reply[:80]))}]")
                 retried_language = True
                 self.history.append({"role": "system", "content": "Responda somente em português do Brasil."})
                 msg = (await self._call_llm()).message
@@ -310,7 +311,7 @@ class LLMAgent:
             if not calls:
                 calls = _calls_in_text(reply, visible)
                 if calls:
-                    log.info(f"[Call written as text: {reply[:120]!r}]")
+                    log.info(f"[Call written as text: {said(repr(reply[:120]))}]")
                     reply = ""                 # it is code, not speech
 
             assistant_entry: dict = {"role": "assistant", "content": reply}
@@ -328,9 +329,9 @@ class LLMAgent:
 
             self.used_tool = True
             for name, args in calls:
-                log.info(f"[Tool: {name}({args})]")
+                log.info(f"[Tool: {name}({said(args)})]")
                 result = await asyncio.to_thread(self._dispatch or dispatch_tool, name, args)
-                log.info(f"[Result: {result}]")
+                log.info(f"[Result: {said(result)}]")
                 self.history.append({"role": "tool", "content": result})
 
     async def warmup(self):

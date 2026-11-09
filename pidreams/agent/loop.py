@@ -8,12 +8,13 @@ from typing import Callable
 from pidreams.audio.recorder import AudioRecorder
 from pidreams.stt.transcriber import Transcriber
 from pidreams.agent.llm import LLMAgent
-from pidreams import pc, reminders
-from pidreams.agent import problems, tools
+from pidreams import pc, reminders, routines
+from pidreams.agent import problems, tools, wake_name
 from pidreams.mcp.confirmation import Confirmer
 from pidreams.agent.memory_client import MemoryClient
 from pidreams.audio.tts import VOICE_LEVEL, TTSEngine
 from pidreams.core.config import CONFIG
+from pidreams.core.logging_setup import said
 from pidreams.core.settings import SETTINGS
 from pidreams.memory.kb_store import label
 from pidreams.monitor import agent as monitor_agent
@@ -187,7 +188,9 @@ async def run_agent(
     emit("status", "⏳ Carregando componentes...")
 
     recorder   = AudioRecorder(mic_device_ref=mic_device_ref)
-    transcriber = Transcriber()
+    transcriber = await asyncio.to_thread(Transcriber)
+    if transcriber.notice:
+        emit("problem", problems.problem("stt_gpu", transcriber.notice, [], level="warning"))
     llm        = LLMAgent()
     monitor_llm: LLMAgent | None = None     # created when the monitor opens, dropped when it reopens
     research_llm: LLMAgent | None = None    # same, for the deep-research mode
@@ -293,6 +296,31 @@ async def run_agent(
         await _deliver(emit, tts, "text" if muted() else mode(), [initial_text])
         await tts.drain()
 
+    def _due_reminders_phrase() -> str:
+        """Reminders that came due since the last check, as one sentence ("" when none)."""
+        from pidreams.briefing import reminders_phrase
+
+        now = datetime.datetime.now()
+        new_items = reminders.due_reminders(now, only_new=True)
+        if not new_items:
+            return ""
+        reminders.mark_notified([l["id"] for l in new_items])
+        return reminders_phrase(new_items, now)
+
+    async def _say(text: str):
+        await _deliver(emit, tts, "text" if muted() else mode(), [text])
+        await tts.drain()
+
+    def _routine_actions() -> dict:
+        """Each step type runs an action the app already has; closing asks for confirmation."""
+        def speak(value: str) -> str:
+            asyncio.run_coroutine_threadsafe(_say(value), loop).result()
+            return "Falei."
+        return {"abrir": tools.open_app, "fechar": pc.fechar_app,
+                "volume": lambda v: pc.mudar_volume(valor=int(v)),
+                "silenciar": lambda v: pc.silenciar(mudo=v == "sim"),
+                "musica": pc.controlar_musica, "falar": speak}
+
     briefing_due = True             # given on the first moment awake (a tray start waits for the wake)
     next_check = time.time() + _REMINDERS_INTERVAL_S
     next_unload = 0.0
@@ -304,6 +332,13 @@ async def run_agent(
             break
 
         if asleep():
+            if time.time() >= next_check:
+                next_check = time.time() + _REMINDERS_INTERVAL_S
+                if phrase := _due_reminders_phrase():
+                    emit("reminder_asleep", phrase)          # the window shows the notification
+                    if SETTINGS.get("tray.speak_reminders") and not muted():
+                        await tts.speak(phrase)
+                        await tts.drain()
             # Background memory jobs may load the model again: checked every 30 s while asleep.
             if model_loaded or time.time() >= next_unload:
                 emit("status", "💤 Dormindo na bandeja")
@@ -335,14 +370,8 @@ async def run_agent(
         if time.time() >= next_check:
             # Reminder due with the app open: announce it between replies.
             next_check = time.time() + _REMINDERS_INTERVAL_S
-            new_items = reminders.due_reminders(datetime.datetime.now(), only_new=True)
-            if new_items:
-                reminders.mark_notified([l["id"] for l in new_items])
-                from pidreams.briefing import reminders_phrase
-
-                await _deliver(emit, tts, "text" if muted() else mode(),
-                               [reminders_phrase(new_items, datetime.datetime.now())])
-                await tts.drain()
+            if phrase := _due_reminders_phrase():
+                await _say(phrase)
 
         # Deep research runs in the background; its milestones and summary are spoken between turns.
         while research_news():
@@ -365,7 +394,8 @@ async def run_agent(
                 emit("status", "🔇 Microfone mudo")
                 await asyncio.sleep(0.15)
                 continue
-            emit("status", "🎤 Aguardando fala...")
+            wake_on = SETTINGS.get("voice.wake_name")
+            emit("status", "🎤 Aguardando ser chamado (diga PI, …)" if wake_on else "🎤 Aguardando fala...")
             try:
                 audio = await recorder.record_until_silence(
                     cancel_check=lambda: (mode() != "voice" or muted() or bool(stop_event and stop_event.is_set())
@@ -383,10 +413,24 @@ async def run_agent(
             if mode() != "voice" or muted() or asleep():
                 continue
             turn["heard"] = time.perf_counter()            # end of speech + the silence wait
-            text = transcriber.transcribe(audio)
+            await asyncio.to_thread(transcriber.sync)     # recognition changed in the settings
+            text = transcriber.transcribe(audio, hotwords=wake_name.hotwords(SETTINGS.get("assistant_name"))
+                                          if wake_on else None)
             turn["stt"] = time.perf_counter()
             if not text:
                 continue
+            # Called by name only (option): speech for someone else gets no reply and no memory.
+            # Answers to the research's own questions do not need the name (confirmations of
+            # actions take another path, through the Confirmer).
+            if wake_on and not (research_ref is not None and research_ref["tools"].awaiting):
+                request = wake_name.strip_name(text, SETTINGS.get("assistant_name"))
+                if request is None:
+                    log.info("speech without the assistant's name: ignored")
+                    continue
+                if not request:
+                    await _say("Estou ouvindo.")
+                    continue
+                text = request
         else:
             emit("status", "⌨️ Aguardando mensagem...")
             # Back every second: research milestones and going to sleep are noticed quickly.
@@ -442,6 +486,11 @@ async def run_agent(
         if monitoring and (tool := monitor_agent.direct_command(text)):
             emit("context_used", _NOTHING_USED)
             await _deliver(emit, tts, mode(), [monitor_ref["tools"].dispatch(tool, {})])
+            continue
+        if routine := routines.find(text, SETTINGS.get("routines")):
+            emit("context_used", _NOTHING_USED)
+            summary = await asyncio.to_thread(routines.run, routine, _routine_actions())
+            await _say(summary)
             continue
         if monitoring:
             text = monitor_agent.name_selected_plane(text, monitor_ref["tools"].selected_flight())
@@ -527,7 +576,7 @@ async def run_agent(
                 if mode() == "voice":
                     await tts.speak(sentence)
             emit("agent_end")
-            log.info("[Reply] %d sentence(s): %s", len(reply_parts), " | ".join(reply_parts)[:600])
+            log.info("[Reply] %d sentence(s): %s", len(reply_parts), said(" | ".join(reply_parts)[:600]))
             if turn.get("first_sentence"):
                 asyncio.create_task(_log_latency(turn, tts))
         except Exception as e:

@@ -31,7 +31,27 @@ def _number(word: str) -> int | None:
     return int(word) if word.isdigit() else _NUMBERS.get(word)
 
 
+def _in_a_while(t: str, now: dt.datetime) -> dt.datetime | None:
+    """ "daqui a 2 minutos", "em meia hora", "dois minutos" (seen in the app on 2026-11-09: the
+    model passes the words as said). Rounded up to the minute, so it never fires early."""
+    if re.search(r"\bmeia hora\b", t):
+        delta = dt.timedelta(minutes=30)
+    else:
+        m = re.search(r"\b(\d{1,3}|" + "|".join(_NUMBERS) + r") (minutos?|min|horas?)\b", t)
+        if not m or not _number(m.group(1)) or re.search(r"\b(as|dia|de)\s+" + re.escape(m.group(1)) + r"\b", t):
+            return None
+        n = _number(m.group(1))
+        delta = dt.timedelta(hours=n) if m.group(2).startswith("hora") else dt.timedelta(minutes=n)
+    moment = now + delta
+    return moment if not (moment.second or moment.microsecond) else \
+        moment.replace(second=0, microsecond=0) + dt.timedelta(minutes=1)
+
+
 def _hour(t: str) -> dt.time | None:
+    # "11 e 21" / "às 11 e 21": how Whisper writes "onze e vinte e um" (seen in the app).
+    m = re.search(r"\b(\d{1,2}) e (\d{1,2})\b", t)
+    if m and int(m.group(1)) < 24 and int(m.group(2)) < 60:
+        return dt.time(int(m.group(1)), int(m.group(2)))
     m = re.search(r"\b(\d{1,2})\s*(?:h|:|horas?\b)\s*(\d{2})?", t)
     if m:
         hour, minute = int(m.group(1)), int(m.group(2) or 0)
@@ -100,6 +120,8 @@ def resolve_when(text: str, now: dt.datetime, include_today: bool = False,
     """(date, time or None). include_today: "sexta" said on a Friday is today (calendar lookup),
     not next week (reminder). A time alone ("às 15h") is today if it hasn't passed, else tomorrow."""
     t = _normalize(text)
+    if moment := _in_a_while(t, now):
+        return moment.date(), moment.time()
     hour = _hour(t)
     try:
         day = _day(t, now.date(), include_today)
@@ -108,7 +130,7 @@ def resolve_when(text: str, now: dt.datetime, include_today: bool = False,
     if day is None:
         if hour is None:
             raise InvalidDate(f"Não entendi a data '{text}'. Diga, por exemplo, amanhã, sexta, "
-                               "dia 12 ou daqui a 3 dias.")
+                               "dia 12, daqui a 3 dias, daqui a 10 minutos ou às 15h30.")
         day = now.date() if hour > now.time() else now.date() + dt.timedelta(days=1)
     if not allow_past and (day < now.date() or (day == now.date() and hour and hour <= now.time())):
         raise InvalidDate(f"'{text}' já passou.")

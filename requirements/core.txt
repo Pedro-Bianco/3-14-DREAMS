@@ -4,6 +4,11 @@ numpy==2.4.4
 sounddevice==0.5.5
 faster-whisper==1.2.1
 ctranslate2==4.7.1
+# Speech recognition on Intel GPUs: Whisper large-v3-turbo through OpenVINO GenAI (Apache-2.0), measured
+# 0.06-0.17 s per sentence on an Arc B580 against 1.2-1.6 s for "small" on the CPU (2026-11-09).
+openvino==2026.4.1
+openvino-genai==2026.4.1.0
+openvino-tokenizers==2026.4.1.0
 # Default voice: Pocket TTS (Kyutai; CC-BY-4.0 weights downloaded at install) on PyTorch for the CPU,
 # streaming the first audio in ~0.1-0.2 s, 3.8x faster than real time (2026-11-04).
 pocket-tts==4.0.1

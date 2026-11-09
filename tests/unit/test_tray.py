@@ -18,7 +18,8 @@ TEST_KEY = r"Software\PIDreamsTest\Run"
 def test_tray_defaults_are_off(tmp_path):
     s = Settings(tmp_path / "settings.json")
     assert s.get("tray") == {"start_with_windows": False, "close_to_tray": False, "idle_minutes": 10,
-                             "claps": True, "clap_level": 0.2, "games": []}
+                             "claps": True, "clap_level": 0.2, "games": [],
+                             "speak_reminders": True}
 
 
 def test_invalid_tray_values_fall_back(tmp_path):

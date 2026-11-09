@@ -65,6 +65,7 @@ ICON = {
     "settings": "", "power": "", "log": "", "folder": "",
     "add": "", "delete": "", "refresh": "", "search": "",
     "globe": "",
+    "name": "",   # contact (called by name)
 }
 
 # Assistant state → (dot color). The text comes from the agent, already in Portuguese.

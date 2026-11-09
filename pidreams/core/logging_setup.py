@@ -14,6 +14,15 @@ from logging.handlers import RotatingFileHandler
 from pidreams.core import paths
 
 LOG_FILE_NAME = "pi_dreams.log"
+
+
+def said(text) -> str:
+    """What someone said, or what the assistant answered or stored about them, goes to the log only
+    when the user turned on "registrar o texto das falas" (off by default). The log used to keep
+    every transcription, including other people talking in the room (found on 2026-11-09)."""
+    from pidreams.core.settings import SETTINGS
+
+    return str(text) if SETTINGS.get("privacy.log_speech") else "[texto oculto]"
 _MAX_BYTES = 2 * 1024 * 1024
 _BACKUPS = 4               # 5 files of 2 MB in total
 
