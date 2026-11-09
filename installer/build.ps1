@@ -40,6 +40,10 @@ if ($check.ExitCode -ne 0) {
 }
 Write-Host "all modules import in the packaged app"
 
+Step "No path of this machine inside the app"
+& $Python installer\check_dist.py dist\PIDreams
+if ($LASTEXITCODE -ne 0) { throw "the packaged app carries this machine's user folder — build stopped" }
+
 Step "Installer (Inno Setup)"
 $Iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") |
     Where-Object { Test-Path $_ } | Select-Object -First 1

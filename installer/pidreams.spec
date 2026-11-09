@@ -13,7 +13,9 @@ datas = [
     (str(ROOT / "pidreams" / "ui" / "assets" / "face_mesh.json"), "pidreams/ui/assets"),   # 3D face geometry
     (str(ROOT / "pidreams" / "assets" / "world_110m.json"), "pidreams/assets"),   # Monitoramento globe
     (str(ROOT / "pidreams" / "assets" / "world_50m_outline.npy"), "pidreams/assets"),   # globe zoomed in (planes)
-    (str(ROOT / "pidreams" / "agent" / "personas"), "pidreams/agent/personas"),
+    # Only the persona files: copying the folder took its __pycache__ along, compiled with the
+    # build machine's absolute path (the code itself is already packaged as modules).
+    (str(ROOT / "pidreams" / "agent" / "personas" / "*.json"), "pidreams/agent/personas"),
     (str(ROOT / "pidreams" / "assets" / "voices"), "pidreams/assets/voices"),   # default voice state
     (str(ROOT / "pidreams" / "assets" / "pidreams.ico"), "pidreams/assets"),   # tray icon
 ]
