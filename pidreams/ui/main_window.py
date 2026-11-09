@@ -16,6 +16,7 @@ from pidreams import pc
 from pidreams.agent import problems
 from pidreams.agent.loop import run_agent
 from pidreams.audio import devices
+from pidreams.audio.claps import ClapListener
 from pidreams.audio import tts as tts_audio
 from pidreams.core import paths
 from pidreams.core.config import CONFIG
@@ -26,7 +27,9 @@ from pidreams.memory.kb_store import KBStore
 from pidreams.plugins.manager import ServiceManager
 from pidreams.mcp import confirmation
 from pidreams.mcp.connections import Connections
+from pidreams.pc.games import game_running
 from pidreams.ui import appearances, theme
+from pidreams.ui.tray import TrayIcon
 from pidreams.ui.widgets import SystemMonitor, WeatherFetcher, MeterWidget
 from pidreams.ui.camera_window import CameraWindowMixin
 from pidreams.ui.notice_bar import NoticeBar
@@ -48,6 +51,18 @@ log = logging.getLogger(__name__)
 
 # Also used to find the window when a second instance is opened.
 WINDOW_TITLE = "PI dreams"
+
+_TRAY_TICK_MS = 5000          # microphone retry while asleep; idle check while awake
+_GAMES_CHECK_S = 3.0
+
+
+def _unload_quietly():
+    from pidreams.agent.llm import unload_model
+
+    try:
+        unload_model()
+    except Exception as e:
+        log.warning("unload before closing: %r", e)
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Main Application
@@ -76,8 +91,11 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         ("powershell", "PowerShell",   False),
     ]
 
-    def __init__(self):
+    def __init__(self, start_asleep: bool = False):
         self.root = tk.Tk()
+        if start_asleep:                 # started with Windows: straight to the tray, no flash
+            self.root.withdraw()
+        self._start_asleep = start_asleep
         theme.init(self.root)
         self.root.title(WINDOW_TITLE)
         self.root.configure(bg=theme.GLASS)
@@ -91,6 +109,12 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         self._stop_event:  asyncio.Event | None = None
         self._mode_ref:    list[str] = ["voice"]
         self._mute_ref:    list      = [False]
+        # Tray: asleep = no window, conversation model off the GPU, microphone only for two claps.
+        self._sleep_ref:   list      = [start_asleep]
+        self._tray:        TrayIcon | None     = None
+        self._claps:       ClapListener | None = None
+        self._last_use = time.monotonic()
+        self._quitting = False
         self._text_input:  queue.Queue = queue.Queue()
 
         self._sphere = None   # center-panel appearance (pidreams/ui/appearances)
@@ -639,10 +663,12 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
                 self._handle_event(etype, data)
         except queue.Empty:
             pass
-        self._update_stats()
-        self._follow_voice()
+        asleep = self._sleep_ref[0]
+        if not asleep:                    # nothing on screen to update while in the tray
+            self._update_stats()
+            self._follow_voice()
         self._show_pending_shutdown()
-        self.root.after(35, self._process_events)
+        self.root.after(250 if asleep else 35, self._process_events)
 
     def _show_pending_shutdown(self):
         """While PI's shutdown/restart counts down, a notice with one-click cancel stays on top."""
@@ -707,6 +733,7 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
             self._show_status(remove_emojis(data or "").strip().rstrip("."), color)
 
         elif etype == "user":
+            self._mark_use()
             self._flush_agent_buf()
             self._chat_insert("\nVocê\n", "user_label")
             self._chat_insert(data + "\n", "user_text")
@@ -728,6 +755,7 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
                     self._show_legend(data, hold_s=6.0)
 
         elif etype == "agent_end":
+            self._mark_use()
             self._agent_working = False
             self._chat_insert("\n", "agent_text")
             self._agent_buf = ""
@@ -776,6 +804,15 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
 
         elif etype == "resolved":
             self._notices.resolve(data)
+
+        elif etype == "wake":
+            self._wake()
+
+        elif etype == "quit":
+            self._quit()
+
+        elif etype == "claps":
+            self._set_claps(data)
 
         elif etype == "stopped":
             self._show_status("Encerrado", theme.MUTED)
@@ -908,7 +945,7 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         self.root.geometry(theme.initial_geometry(saved.get("geometry", ""), self.root.winfo_screenwidth(),
                                                   self.root.winfo_screenheight(), on_screen))
         self._normal_geometry = self.root.geometry()
-        if saved.get("zoomed"):
+        if saved.get("zoomed") and not self._start_asleep:     # zooming would show the window
             self.root.after_idle(lambda: self.root.state("zoomed"))
         self.root.bind("<Configure>", self._remember_geometry, add="+")
 
@@ -979,6 +1016,7 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
                 connections=self._connections,
                 monitor_ref=self._monitor_ref,
                 research_ref=self._research_ref,
+                sleep_ref=self._sleep_ref,
             )
             self._emit("stopped")
 
@@ -989,7 +1027,21 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def _on_close(self):
-        self._save_window()
+        if SETTINGS.get("tray.close_to_tray") and self._tray is not None:
+            self._sleep()
+        else:
+            self._quit()
+
+    def _quit(self):
+        if self._quitting:
+            return
+        self._quitting = True
+        if self._claps:
+            self._claps.stop()
+        if self._tray:
+            self._tray.destroy()
+        if self.root.state() != "withdrawn":       # asleep: saved when it went to the tray
+            self._save_window()
         self._services.stop_all()
         self._connections.stop_all()
         if self._sphere:
@@ -1002,7 +1054,122 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         else:
             self.root.destroy()
 
+    # ── Tray (asleep / awake) ─────────────────────────────────────────────────
+
+    def _start_tray(self):
+        try:
+            # The icon's callbacks run inside a Windows message handler: they only queue the event,
+            # and the window acts on it from its own loop (Tk code run from there crashed the app on
+            # going to sleep and quitting: "PyEval_RestoreThread").
+            self._tray = TrayIcon(on_wake=lambda: self._emit("wake"), on_claps=lambda on: self._emit("claps", on),
+                                  on_quit=lambda: self._emit("quit"))
+        except Exception as e:
+            log.warning("tray icon unavailable (closing the window exits): %r", e)
+        self.root.bind_all("<ButtonPress>", self._mark_use, add="+")
+        self.root.bind_all("<KeyPress>", self._mark_use, add="+")
+        if self._sleep_ref[0]:
+            self._sleep()
+        self.root.after(_TRAY_TICK_MS, self._tray_tick)
+        threading.Thread(target=self._watch_games, daemon=True, name="games").start()
+
+    def _mark_use(self, _event=None):
+        self._last_use = time.monotonic()
+
+    def _sleep(self):
+        """To the tray: no window; the loop stops listening and takes the model off the GPU."""
+        if self._tray is None or self._quitting:
+            return
+        if self.root.state() != "withdrawn":
+            self._save_window()
+        self._sleep_ref[0] = True
+        self._close_monitor()             # the globe draws at 120 fps: nothing runs unseen
+        if self._sphere:
+            self._sphere.stop()
+        self.root.withdraw()
+        self._update_claps()
+
+    def _wake(self):
+        if self._quitting:
+            return
+        was_asleep, self._sleep_ref[0] = self._sleep_ref[0], False
+        self._update_claps()
+        if was_asleep and self._sphere:
+            self._switch_appearance(self._sphere.id)      # its animation stopped on sleeping
+        self.root.deiconify()
+        if SETTINGS.get("window.zoomed"):
+            self.root.state("zoomed")
+        # Woken by claps there was no click: Windows only lets a topmost flip bring it forward.
+        self.root.attributes("-topmost", True)
+        self.root.after(200, lambda: self.root.attributes("-topmost", False))
+        self.root.focus_force()
+        self._mark_use()
+
+    def _set_claps(self, on: bool):
+        SETTINGS.set("tray.claps", on)
+        SETTINGS.save()
+        self._update_claps()
+
+    def _update_claps(self):
+        """The microphone listens for claps only while asleep and allowed; the icon always says
+        which (listening, paused, no microphone)."""
+        wanted = self._sleep_ref[0] and SETTINGS.get("tray.claps")
+        if not wanted:
+            if self._claps:
+                self._claps.stop()
+                self._claps = None
+        elif self._claps is None or not self._claps.active:
+            try:
+                self._claps = ClapListener(
+                    # Through the event queue: Tk must not be touched from the audio thread
+                    # (root.after from there crashed the app: "PyEval_RestoreThread").
+                    self._mic_device_ref[0], on_claps=lambda: self._emit("wake"),
+                    ignore=lambda: bool(tts_module.SPEAKING_TEXT[0]) or self._radio.station is not None,
+                    min_level=SETTINGS.get("tray.clap_level"))
+                self._claps.start()
+            except Exception as e:
+                log.warning("clap listener: %r", e)
+                self._claps = None
+        if self._tray is None:
+            return
+        if not self._sleep_ref[0]:
+            self._tray.hide()
+        elif not SETTINGS.get("tray.claps"):
+            self._tray.show("paused")
+        else:
+            self._tray.show("listening" if self._claps else "no_mic")
+
+    def _tray_tick(self):
+        """Asleep: microphone back if it was unplugged. Awake: to the tray after the idle time."""
+        if self._quitting:
+            return
+        if self._sleep_ref[0]:
+            self._update_claps()
+        elif (SETTINGS.get("tray.close_to_tray") and not self._agent_working
+              and not tts_module.SPEAKING_TEXT[0] and not self._research_ref["tools"].running
+              and time.monotonic() - self._last_use > SETTINGS.get("tray.idle_minutes") * 60):
+            log.info("idle for %d min: to the tray", SETTINGS.get("tray.idle_minutes"))
+            self._sleep()
+        self.root.after(_TRAY_TICK_MS, self._tray_tick)
+
+    def _watch_games(self):
+        """A game running closes the app completely, model off the GPU first (also right at start)."""
+        while not self._quitting:
+            try:
+                reason = game_running(SETTINGS.get("tray.games"))
+            except Exception as e:
+                log.warning("game check: %r", e)
+                reason = None
+            if reason:
+                log.info("game detected (%s): closing completely", reason)
+                unload = threading.Thread(target=_unload_quietly, daemon=True)
+                unload.start()
+                unload.join(3)
+                self._emit("quit")
+                return
+            time.sleep(_GAMES_CHECK_S)
+
     def run(self):
+        self._start_tray()
         self._tick_services()
         self._restart_saved_connections()
         threading.Thread(target=self._load_stores_thread, daemon=True).start()

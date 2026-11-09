@@ -203,3 +203,12 @@ def test_resposta_falada_as_opcoes():
     assert agent.match_choices(choices, "a primeira") == ["Conceitos", ""]
     assert agent.match_choices(choices, "tanto faz") == ["", ""]
     assert agent.match_choices(choices[:1], "quero algo para iniciantes") == ["quero algo para iniciantes"]
+
+
+def test_free_wording_opens_and_closes_the_research_mode():
+    from pidreams.research import agent
+
+    assert agent.is_open_request("Vamos abrir a pesquisa profunda?")
+    assert agent.is_close_request("sair do modo de pesquisa")
+    assert not agent.is_open_request("o que a pesquisa profunda faz?")
+    assert not agent.is_close_request("abre a pesquisa profunda")

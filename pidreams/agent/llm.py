@@ -342,3 +342,17 @@ class LLMAgent:
             think=False,
             keep_alive=CONFIG.ollama_keep_alive,
         )
+
+    async def unload(self) -> bool:
+        return await asyncio.to_thread(unload_model, self._client)
+
+
+def unload_model(client: ollama.Client | None = None) -> bool:
+    """Takes the conversation model off the GPU (app asleep, or a game opened). Only when it is
+    resident: a keep_alive=0 call on an unloaded model would load it first. True if it was."""
+    client = client or ollama.Client(host=CONFIG.ollama_host, timeout=30)
+    target = CONFIG.ollama_model if ":" in CONFIG.ollama_model else f"{CONFIG.ollama_model}:latest"
+    if target not in {m.model for m in client.ps().models}:
+        return False
+    client.generate(model=CONFIG.ollama_model, keep_alive=0)
+    return True

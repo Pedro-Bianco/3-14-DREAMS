@@ -110,7 +110,7 @@ def main():
         from pidreams.core.settings import SETTINGS
         if not SETTINGS.get("first_run_done") and not run_wizard(SETTINGS):
             return                  # wizard closed: it opens again next time
-        app = AgentApp()
+        app = AgentApp(start_asleep="--tray" in sys.argv)   # --tray: started with Windows
         logging_setup.install_on_tk(app.root)
         app.run()
 

@@ -1,6 +1,6 @@
 ; PI dreams installer — Inno Setup 6. Build it with installer\build.ps1.
 
-#define AppVersion "0.9.2"
+#define AppVersion "1.0.0"
 ; Ollama older than this gets updated. Set by measurement
 ; (first version with Vulkan on by default).
 #define MinOllama "0.40.6"
@@ -20,7 +20,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 OutputDir=Output
 OutputBaseFilename=PIDreams-Setup-{#AppVersion}
-SetupIconFile=assets\pidreams.ico
+SetupIconFile=..\pidreams\assets\pidreams.ico
 UninstallDisplayIcon={app}\PIDreams.exe
 Compression=lzma2/max
 SolidCompression=yes
@@ -44,6 +44,11 @@ Source: "..\LICENSES\*"; DestDir: "{app}\LICENSES"; Flags: ignoreversion
 [Icons]
 Name: "{autoprograms}\PI dreams"; Filename: "{app}\PIDreams.exe"
 Name: "{autodesktop}\PI dreams"; Filename: "{app}\PIDreams.exe"; Tasks: desktopicon
+
+[Registry]
+; "Start with Windows" is written by the app; ValueType none = never created here, only removed
+; on uninstall.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "PI dreams"; ValueType: none; Flags: uninsdeletevalue dontcreatekey
 
 [Run]
 Filename: "{app}\PIDreams.exe"; Parameters: "--setup-models"; StatusMsg: "Baixando os modelos de IA (pode levar alguns minutos)..."; Flags: waituntilterminated

@@ -159,9 +159,12 @@ async def run_agent(
     connections=None,
     monitor_ref: dict | None = None,
     research_ref: dict | None = None,
+    sleep_ref: list | None = None,
 ):
     """monitor_ref: {"on": bool, "tools": MonitorAgentTools, "fresh": bool} — while "on", the
-    monitor's own agent answers (no memory, documents or reflection in those turns)."""
+    monitor's own agent answers (no memory, documents or reflection in those turns).
+    sleep_ref: [bool] — while True (app in the tray) the loop neither listens nor speaks and the
+    conversation model is off the GPU; it is loaded again on waking, before listening."""
     def emit(etype: str, data=None):
         if on_event:
             on_event(etype, data)
@@ -177,6 +180,9 @@ async def run_agent(
 
     def muted() -> bool:
         return bool(mute_ref[0]) if mute_ref else False
+
+    def asleep() -> bool:
+        return bool(sleep_ref[0]) if sleep_ref else False
 
     emit("status", "⏳ Carregando componentes...")
 
@@ -212,6 +218,8 @@ async def run_agent(
         if not await problems.wait_for_model(emit, stop_event):
             await tts.shutdown()
             return
+        if asleep():          # started in the tray: the model loads on waking
+            break
         emit("status", "🔁 Carregando o modelo de conversa...")
         try:
             await llm.warmup()
@@ -220,6 +228,7 @@ async def run_agent(
             log.warning("warmup failed: %r", e)
             emit("problem", problems.from_chat(e))
 
+    model_loaded = not asleep()
     await recorder.calibrate()
 
     # Confirmation for MCP tools that change something. Runs on the tool's thread;
@@ -267,28 +276,61 @@ async def run_agent(
 
     tools.configure_mcp(connections, Confirmer(_ask, _listen, _shutdown))
 
-    emit("status", "🟢 Pronto — fale algo")
-    # Briefing instead of "Estou pronto": full once a day (or every time the app opens, if the user
-    # chose so), otherwise reminders only.
-    today = datetime.date.today()
-    briefing_settings = SETTINGS.get("resumo") or {}
-    full_briefing = briefing_settings.get("ligado", True) and (
-        briefing_settings.get("toda_vez", False) or reminders.last_briefing() != today.isoformat())
-    if full_briefing:
-        await asyncio.sleep(2)                 # gives saved connections time to reconnect
-    initial_text = await asyncio.to_thread(_briefing_text, connections, full_briefing)
-    if full_briefing:
-        reminders.record_briefing(today)
-    # Muted or text mode: the briefing only shows in the chat.
-    await _deliver(emit, tts, "text" if muted() else mode(), [initial_text])
-    await tts.drain()
+    async def _briefing():
+        # Briefing instead of "Estou pronto": full once a day (or every time the app opens, if the
+        # user chose so), otherwise reminders only.
+        emit("status", "🟢 Pronto — fale algo")
+        today = datetime.date.today()
+        briefing_settings = SETTINGS.get("resumo") or {}
+        full_briefing = briefing_settings.get("ligado", True) and (
+            briefing_settings.get("toda_vez", False) or reminders.last_briefing() != today.isoformat())
+        if full_briefing:
+            await asyncio.sleep(2)                 # gives saved connections time to reconnect
+        initial_text = await asyncio.to_thread(_briefing_text, connections, full_briefing)
+        if full_briefing:
+            reminders.record_briefing(today)
+        # Muted or text mode: the briefing only shows in the chat.
+        await _deliver(emit, tts, "text" if muted() else mode(), [initial_text])
+        await tts.drain()
+
+    briefing_due = True             # given on the first moment awake (a tray start waits for the wake)
     next_check = time.time() + _REMINDERS_INTERVAL_S
+    next_unload = 0.0
 
     pending_text: str | None = None
 
     while True:
         if stop_event and stop_event.is_set():
             break
+
+        if asleep():
+            # Background memory jobs may load the model again: checked every 30 s while asleep.
+            if model_loaded or time.time() >= next_unload:
+                emit("status", "💤 Dormindo na bandeja")
+                try:
+                    await llm.unload()
+                except Exception as e:
+                    log.warning("unload on sleep failed: %r", e)
+                model_loaded, next_unload = False, time.time() + 30
+            await asyncio.sleep(0.2)
+            continue
+        if not model_loaded:
+            emit("status", "🔁 Carregando o modelo de conversa...")
+            try:
+                started = time.perf_counter()
+                await llm.warmup()
+                log.info("wake: model loaded in %.1f s", time.perf_counter() - started)
+                model_loaded = True
+            except Exception as e:
+                log.warning("warmup on wake failed: %r", e)
+                emit("problem", problems.from_chat(e))
+                await asyncio.sleep(3)
+                continue
+            if not briefing_due:
+                emit("status", "🟢 Pronto — fale algo")
+        if briefing_due:
+            briefing_due = False
+            await _briefing()
 
         if time.time() >= next_check:
             # Reminder due with the app open: announce it between replies.
@@ -327,7 +369,7 @@ async def run_agent(
             try:
                 audio = await recorder.record_until_silence(
                     cancel_check=lambda: (mode() != "voice" or muted() or bool(stop_event and stop_event.is_set())
-                                          or research_news())
+                                          or research_news() or asleep())
                 )
             except Exception as e:
                 log.warning("microphone: %r", e)
@@ -338,7 +380,7 @@ async def run_agent(
                 continue
             if stop_event and stop_event.is_set():
                 break
-            if mode() != "voice" or muted():
+            if mode() != "voice" or muted() or asleep():
                 continue
             turn["heard"] = time.perf_counter()            # end of speech + the silence wait
             text = transcriber.transcribe(audio)
@@ -347,9 +389,8 @@ async def run_agent(
                 continue
         else:
             emit("status", "⌨️ Aguardando mensagem...")
-            text = await _wait_text(text_input_queue, stop_event,
-                                    until=min(next_check, time.time() + 1) if research_ref is not None
-                                    and research_ref["tools"].running else next_check)
+            # Back every second: research milestones and going to sleep are noticed quickly.
+            text = await _wait_text(text_input_queue, stop_event, until=min(next_check, time.time() + 1))
             if text is None:
                 continue
 
@@ -477,7 +518,7 @@ async def run_agent(
         try:
             emit("agent_start")
             async for sentence in agent.chat_streaming(text, recall=recall, kb=kb_recall, profile=profile):
-                if interrupt_event.is_set():
+                if interrupt_event.is_set() or asleep():      # sent to the tray mid-reply: hush
                     break
                 if not reply_parts and turn:
                     turn["first_sentence"] = time.perf_counter()
@@ -512,7 +553,9 @@ async def run_agent(
                 except asyncio.CancelledError:
                     pass
 
-        if mode() == "voice" and not interrupt_event.is_set():
+        if asleep():
+            tts.interrupt()
+        elif mode() == "voice" and not interrupt_event.is_set():
             emit("status", "🔊 Respondendo...")
             await tts.drain()
 

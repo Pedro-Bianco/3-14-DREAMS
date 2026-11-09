@@ -6,13 +6,16 @@ a place is not repeated here.
 """
 
 import os
+import queue
 import threading
+import time
 import tkinter as tk
 from tkinter import ttk
 
 from pidreams.agent.personas import conduct
-from pidreams.audio import devices, voices
+from pidreams.audio import claps, devices, voices
 from pidreams.core import paths
+from pidreams.pc import startup
 from pidreams.ui import appearances
 from pidreams.ui import theme
 
@@ -43,8 +46,14 @@ class SettingsDialog:
             "llm.model": tk.StringVar(value=settings.get("llm.model") or _RECOMMENDED),
             "ollama.host": tk.StringVar(value=settings.get("ollama.host")),
             "ollama.timeout_s": tk.DoubleVar(value=settings.get("ollama.timeout_s")),
+            # The Run key is the truth (the user may have turned it off in Task Manager).
+            "tray.start_with_windows": tk.BooleanVar(value=startup.is_enabled()),
+            "tray.close_to_tray": tk.BooleanVar(value=settings.get("tray.close_to_tray")),
+            "tray.idle_minutes": tk.IntVar(value=settings.get("tray.idle_minutes")),
+            "tray.claps": tk.BooleanVar(value=settings.get("tray.claps")),
+            "tray.clap_level": tk.DoubleVar(value=settings.get("tray.clap_level")),
         }
-        for title, build in (("Geral", self._general), ("Áudio e voz", self._audio),
+        for title, build in (("Geral", self._general), ("Áudio e voz", self._audio), ("Bandeja", self._tray),
                                ("Hardware e modelo", self._hardware), ("Avançado", self._advanced)):
             tab = tk.Frame(tabs, bg=theme.GLASS, padx=theme.px(18), pady=theme.px(12))
             tabs.add(tab, text=title)
@@ -122,6 +131,75 @@ class SettingsDialog:
         self._label(tab, "Velocidade da fala (maior = mais devagar)")
         theme.Slider(tab, self.v["voice.length_scale"], 0.5, 2.0).pack(fill=tk.X)
 
+    def _tray(self, tab):
+        self._label(tab, "Dormindo na bandeja (ao lado do relógio), o PI fica sem janela e sem o modelo de "
+                         "conversa na placa de vídeo; acorda com um clique no ícone ou com duas palmas.", dim=True)
+        for key, text in (("tray.start_with_windows", "Iniciar junto com o Windows (já na bandeja)"),
+                          ("tray.close_to_tray", "Ao fechar a janela, ir para a bandeja em vez de sair"),
+                          ("tray.claps", "Ouvir duas palmas para acordar (só o volume do som: nada é gravado "
+                                         "nem transcrito)")):
+            theme.check(tab, text, self.v[key]).pack(anchor="w", pady=(theme.px(6), 0))
+        line = tk.Frame(tab, bg=theme.GLASS)
+        line.pack(fill=tk.X, pady=(theme.px(8), 0))
+        theme.button(line, "Calibrar palmas", self._calibrate_claps).pack(side=tk.LEFT)
+        self._clap_info = tk.Label(line, text="", bg=theme.GLASS, fg=theme.MUTED, font=theme.FONT_SMALL,
+                                   anchor="w", justify="left", wraplength=theme.px(420))
+        self._clap_info.pack(side=tk.LEFT, fill=tk.X, padx=theme.px(10))
+        self._show_clap_level()
+        self._label(tab, "Voltar à bandeja depois de quantos minutos sem uso (com a opção de fechar para a bandeja)")
+        self._field(tab, self.v["tray.idle_minutes"])
+        self._label(tab, "Jogos que fecham o PI por completo (um executável por linha, ex.: jogo.exe). "
+                         "Jogos em tela cheia exclusiva já são reconhecidos sozinhos.", dim=True)
+        self._games = tk.Text(tab, height=4, bg=theme.INPUT, fg=theme.TEXT, insertbackground=theme.TEXT,
+                              relief=tk.FLAT, font=theme.FONT_SMALL, highlightthickness=0)
+        self._games.insert("1.0", "\n".join(self.st.get("tray.games")))
+        self._games.pack(fill=tk.X)
+
+    def _show_clap_level(self, text: str = ""):
+        self._clap_info.config(text=text or f"Sensibilidade atual: palmas acima de "
+                               f"{self.v['tray.clap_level'].get():.2f}. Calibre se trocar de microfone.")
+
+    def _calibrate_claps(self):
+        """Three pairs of claps set the floor for this microphone (half of the weakest). Only loudness
+        numbers are kept; the detector runs with the lowest floor so weak microphones are heard too."""
+        if getattr(self, "_calibration", None) is not None:
+            return
+        name = self.v["audio.input_device"].get()
+        device = devices.index(None if name == _DEFAULT_DEVICE else name, "input")
+        heard: queue.Queue = queue.Queue()          # the audio thread never touches Tk
+        listener = claps.ClapListener(device, on_claps=lambda: heard.put(listener.detector.last_peaks),
+                                      ignore=lambda: False, min_level=claps.CALIBRATION_RANGE[0])
+        try:
+            listener.start()
+        except Exception as e:
+            self._show_clap_level(f"Microfone indisponível: {e}")
+            return
+        self._calibration = {"listener": listener, "peaks": [], "end": time.monotonic() + _CALIBRATION_S}
+        self._show_clap_level(f"Bata duas palmas, {_CALIBRATION_PAIRS} vezes, com uma pausa entre elas…")
+
+        def poll():
+            state = self._calibration
+            while not heard.empty():
+                state["peaks"].extend(heard.get())
+            pairs = len(state["peaks"]) // 2
+            if pairs < _CALIBRATION_PAIRS and time.monotonic() < state["end"] and self.window.winfo_exists():
+                if pairs:
+                    self._show_clap_level(f"Ouvi {pairs} de {_CALIBRATION_PAIRS}…")
+                self.window.after(100, poll)
+                return
+            listener.stop()
+            self._calibration = None
+            if not self.window.winfo_exists():
+                return
+            if pairs < _CALIBRATION_PAIRS:
+                self._show_clap_level(f"Ouvi só {pairs} de {_CALIBRATION_PAIRS} pares. Bata mais perto do "
+                                      "microfone e tente de novo.")
+                return
+            self.v["tray.clap_level"].set(claps.calibrated_level(state["peaks"]))
+            self._show_clap_level(f"Pronto: palmas acima de {self.v['tray.clap_level'].get():.2f}. "
+                                  "Clique em Salvar para usar.")
+        poll()
+
     def _hardware(self, tab):
         from pidreams.hardware import detect
         from pidreams.hardware.recommend import recommend_models
@@ -172,7 +250,8 @@ class SettingsDialog:
     # ── save ───────────────────────────────────────────────────────────────
 
     _LABELS = {"assistant_name": "nome do assistente (1 a 40 letras)", "treatment": "tratamento (até 40 letras)",
-                "ollama.timeout_s": "tempo de espera (10 a 1800 s)", "voice.length_scale": "velocidade"}
+                "ollama.timeout_s": "tempo de espera (10 a 1800 s)", "voice.length_scale": "velocidade",
+                "tray.idle_minutes": "minutos sem uso (1 a 240)"}
 
     def save(self):
         if self._needs_voice_download():
@@ -193,6 +272,7 @@ class SettingsDialog:
             if (key in ("audio.input_device", "audio.output_device") and value == _DEFAULT_DEVICE) or                (key == "llm.model" and value == _RECOMMENDED):
                 value = None
             new_items[key] = value
+        new_items["tray.games"] = [line.strip() for line in self._games.get("1.0", tk.END).splitlines() if line.strip()]
         previous_items = {c: self.st.get(c) for c in new_items}
         for key, value in new_items.items():
             try:
@@ -204,8 +284,25 @@ class SettingsDialog:
                 self.st.set(key, value)
             self._status.config(text="corrija: " + ", ".join(errors), fg=theme.DANGER)
             return
+        startup_problem = self._apply_startup()
         self.st.save()                   # notifies the subscribers: prompt, voice, audio...
-        self._status.config(text="salvo — vale a partir da próxima interação", fg=theme.MUTED)
+        if startup_problem:
+            self._status.config(text=startup_problem, fg=theme.DANGER)
+        else:
+            self._status.config(text="salvo — vale a partir da próxima interação", fg=theme.MUTED)
+
+    def _apply_startup(self) -> str | None:
+        """Writes or deletes the Run value; on failure the setting keeps what Windows really has."""
+        wanted = self.st.get("tray.start_with_windows")
+        if wanted == startup.is_enabled():
+            return None
+        try:
+            startup.set_enabled(wanted)
+            return None
+        except OSError as e:
+            self.st.set("tray.start_with_windows", startup.is_enabled())
+            self.v["tray.start_with_windows"].set(startup.is_enabled())
+            return f"não consegui mudar o início com o Windows ({e.strerror or e})"
 
 
     def _needs_voice_download(self) -> bool:
@@ -233,6 +330,8 @@ class SettingsDialog:
 
 
 _RECOMMENDED = "Recomendado para este PC"
+_CALIBRATION_PAIRS = 3
+_CALIBRATION_S = 30
 _EFFECTS_LABEL = {"": "Desligado", "leve": "Leve", "medio": "Médio", "forte": "Forte"}
 # (resumo.ligado, resumo.toda_vez) → what the user sees.
 _BRIEFING_WHEN_LABEL = {(True, False): "Uma vez por dia", (True, True): "Toda vez que abrir",

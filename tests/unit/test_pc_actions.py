@@ -174,3 +174,17 @@ def test_desligamento_fica_pendente_ate_cancelar_ou_passar_a_hora(monkeypatch):
     assert pc.cancelar_desligamento() == "Desligamento cancelado." and pc.pending_shutdown() is None
     pc._PENDING[0] = ("desligar", dt.datetime.now() - dt.timedelta(seconds=1))
     assert pc.pending_shutdown() is None
+
+
+def test_open_app_says_when_nothing_was_found(monkeypatch):
+    """Asked to open "monitoramento", the old fallback reported success and the model said the mode
+    was on; now the model hears that nothing opened."""
+    from pidreams.agent import tools
+
+    def missing(target):
+        raise FileNotFoundError(2, "not found", target)
+
+    monkeypatch.setattr(tools.os, "startfile", missing)
+    monkeypatch.setattr(tools, "_allowed_apps", None)
+    result = tools.open_app("monitoramento")
+    assert "Não encontrei" in result and "Nada foi aberto" in result

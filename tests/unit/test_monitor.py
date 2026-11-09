@@ -153,6 +153,15 @@ def test_posicao_e_altitude_da_estacao():
 def test_abrir_e_fechar_monitoramento_sao_decididos_pelo_codigo():
     assert agent.is_close_request("Fechar monitoramento!") and not agent.is_close_request("fechar o spotify")
     assert agent.is_open_request("Abra o monitoramento.") and not agent.is_open_request("abra o spotify")
+    for said in ("Vamos abrir o modo de monitoramento?", "ativa o monitoramento", "Quero entrar no modo monitoramento"):
+        assert agent.is_open_request(said), said
+    for said in ("o que é o monitoramento?", "fecha o monitoramento", "sair do modo monitoramento",
+                 "abre o spotify"):
+        assert not agent.is_open_request(said), said
+    for said in ("sair do modo de monitoramento.", "Pode fechar o modo de monitoramento?", "desliga o monitoramento"):
+        assert agent.is_close_request(said), said
+    for said in ("o que é o monitoramento?", "abre o monitoramento", "fecha o spotify"):
+        assert not agent.is_close_request(said), said
 
 
 def test_ferramenta_sem_lugar_pede_de_novo_e_lugar_gira_o_globo(monkeypatch):

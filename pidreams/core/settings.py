@@ -42,6 +42,10 @@ DEFAULTS: dict[str, Any] = {
     "resumo": {"ligado": True, "toda_vez": False, "clima": True, "agenda": True, "emails": True, "lembretes": True},
     # Main window as it was last closed; empty geometry = first opening (centered).
     "window": {"geometry": "", "zoomed": False},
+    # Tray: sleep in the notification area instead of closing, wake on two claps, start with
+    # Windows; games = executable names that close the app completely when running.
+    "tray": {"start_with_windows": False, "close_to_tray": False, "idle_minutes": 10,
+             "claps": True, "clap_level": 0.2, "games": []},   # clap_level: from calibrating
 }
 
 # Accepted ranges; everything else only needs the default's type.
@@ -49,6 +53,8 @@ _RANGES = {
     "audio.volume": (0.0, 1.0),
     "voice.length_scale": (0.5, 2.0),
     "ollama.timeout_s": (10.0, 1800.0),
+    "tray.idle_minutes": (1, 240),
+    "tray.clap_level": (0.02, 0.5),
 }
 _LENGTHS = {"assistant_name": (1, 40), "treatment": (0, 40)}
 # Fields that take one of a fixed set of values.
@@ -76,6 +82,8 @@ def _valid(key: str, value: Any, default: Any) -> bool:
         ok = lo <= len(value) <= hi
     if ok and key in _CHOICES:
         ok = value in _CHOICES[key]
+    if ok and isinstance(default, list):
+        ok = all(isinstance(item, str) for item in value)
     return ok
 
 

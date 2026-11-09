@@ -33,3 +33,20 @@ def today_in_words(today: dt.date | None = None) -> str:
 def now_in_words(now: dt.datetime | None = None) -> str:
     now = now or dt.datetime.now()
     return f"{today_in_words(now.date())}, agora são {now:%H:%M}"
+
+
+# Opening and closing a mode (Monitoramento, Pesquisa profunda) is decided by code. Fixed phrase
+# lists missed free wording ("vamos abrir o modo de monitoramento?", "sair do modo de
+# monitoramento"): the model then tried open_app or only explained how to close.
+_OPEN_VERB = re.compile(r"\b(abr\w*|ativ\w*|lig\w*|entr\w*|mostr\w*|inici\w*|vamos|quero)\b")
+_CLOSE_VERB = re.compile(r"\b(fech\w*|sai\w*|sair|deslig\w*|encerr\w*)\b")
+
+
+def asks_to_open(phrase: str, mode: str, max_words: int = 8) -> bool:
+    """A short sentence naming the mode with an opening verb and no closing one."""
+    return (mode in phrase and len(phrase.split()) <= max_words
+            and bool(_OPEN_VERB.search(phrase)) and not _CLOSE_VERB.search(phrase))
+
+
+def asks_to_close(phrase: str, mode: str, max_words: int = 8) -> bool:
+    return mode in phrase and len(phrase.split()) <= max_words and bool(_CLOSE_VERB.search(phrase))

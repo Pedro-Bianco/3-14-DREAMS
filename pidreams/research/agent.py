@@ -13,6 +13,7 @@ import ollama
 from pidreams.core import paths
 from pidreams.core.config import CONFIG
 from pidreams.core.settings import SETTINGS
+from pidreams.core.text import asks_to_close, asks_to_open
 from pidreams.research.job import Cancelled, ResearchJob
 
 log = logging.getLogger(__name__)
@@ -30,11 +31,14 @@ def _phrase(text: str) -> str:
 
 
 def is_open_request(text: str) -> bool:
-    return _phrase(text) in OPEN_PHRASES
+    # Up to 6 words: a longer sentence usually brings the topic, which the research agent must read.
+    phrase = _phrase(text)
+    return phrase in OPEN_PHRASES or asks_to_open(phrase, "pesquisa profunda", max_words=6)
 
 
 def is_close_request(text: str) -> bool:
-    return _phrase(text) in CLOSE_PHRASES
+    phrase = _phrase(text)
+    return phrase in CLOSE_PHRASES or asks_to_close(phrase, "pesquisa")
 
 
 def is_cancel_request(text: str) -> bool:

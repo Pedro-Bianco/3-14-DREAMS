@@ -1,5 +1,4 @@
 import os
-import subprocess
 import webbrowser
 import urllib.request
 import urllib.parse
@@ -177,15 +176,16 @@ def open_app(target: str) -> str:
         basename = os.path.basename(target).lower().replace(".exe", "").strip()
         if basename not in _allowed_apps:
             return f"Acesso negado: '{basename}' não está na lista de apps permitidos."
+    # No "start <name>" fallback: it reported success for anything (asked to open "monitoramento",
+    # Windows only showed an error and the model said the mode was on). The same shell lookup
+    # (App Paths, file associations, URIs) is what startfile does.
     try:
         os.startfile(target)
         return f"Abrindo: {target}"
-    except Exception:
-        try:
-            subprocess.Popen(f"start {target}", shell=True)
-            return f"Comando enviado para abrir: {target}"
-        except Exception as e:
-            return f"Erro ao abrir '{target}': {e}"
+    except FileNotFoundError:
+        return f"Não encontrei um programa ou arquivo chamado '{target}'. Nada foi aberto."
+    except OSError as e:
+        return f"Erro ao abrir '{target}': {e}. Nada foi aberto."
 
 
 def web_search(query: str) -> str:

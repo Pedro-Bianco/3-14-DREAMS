@@ -47,6 +47,8 @@
 - **[Pesquisa profunda](#pesquisa-profunda)**: tira dúvidas sobre o tema com perguntas de
   múltipla escolha, pesquisa na Wikipédia e nas notícias, lê as fontes e escreve um relatório com
   citações, que fica guardado na Base.
+- **[Bandeja e palmas](#bandeja-e-palmas)**: dorme ao lado do relógio sem ocupar a placa de vídeo,
+  acorda com duas palmas ou um clique, pode iniciar com o Windows e fecha sozinho quando um jogo abre.
 - **[Monitoramento](#monitoramento)**: um globo 3D que gira com o mouse, com os mais de 16 mil
   satélites em órbita em tempo real, terremotos do dia, rádios do mundo e aviões ao vivo com rastros. Clique num país ou
   pergunte ("o que está acontecendo no Japão?") e um agente próprio resume as notícias de lá
@@ -236,6 +238,24 @@ dizia sobre custo?") e ele responde citando-o. Toda fonte listada foi de fato li
 não bastam, ele diz isso em vez de completar por conta própria. Sem conta: só fontes gratuitas, então
 temas bem específicos podem render menos fontes.
 
+## Bandeja e palmas
+
+Em **Configurações → Bandeja**, o PI pode dormir ao lado do relógio em vez de fechar:
+
+- **Ao fechar a janela, ir para a bandeja** — e, com isso ligado, voltar sozinho para a bandeja depois
+  de alguns minutos sem uso (10, por padrão).
+- **Dormindo**, o modelo de conversa sai da placa de vídeo e o processador fica praticamente parado
+  (0,1% medido); o reconhecimento de voz e a voz continuam prontos, então ele acorda em ~3 s.
+- **Duas palmas** ou um clique no ícone acordam o PI. Para as palmas, ele mede só o volume do som, em
+  pedaços de 10 ms descartados na hora: nada é gravado, transcrito ou enviado. A sensibilidade foi
+  medida com palmas reais e com barulhos do dia a dia (teclado, mesa, cadeira). O ícone mostra quando
+  ele está ouvindo, e "Ouvir palmas", no menu do ícone, desliga a escuta.
+- **Iniciar junto com o Windows**, já dormindo na bandeja.
+- **Jogos**: ao detectar um jogo aberto, o PI fecha por completo, sem deixar processo nenhum. Ele
+  reconhece sozinho jogos em tela cheia exclusiva (pelo próprio Windows, sem olhar a memória de outros
+  programas nem capturar teclado ou mouse); jogos em janela sem borda entram numa lista sua de
+  executáveis. Depois do jogo, abra o PI de novo (ou ele volta no próximo início do Windows).
+
 ## Experimente dizer
 
 | Você diz | O que acontece |
@@ -259,7 +279,7 @@ temas bem específicos podem render menos fontes.
 
 | Fica no seu PC | Usa a internet, só quando você pede ou liga |
 |---|---|
-| Sua voz (o áudio nem é gravado em disco) | Clima ([Open-Meteo](https://open-meteo.com)) |
+| Sua voz (o áudio nem é gravado em disco), inclusive a escuta de palmas na bandeja | Clima ([Open-Meteo](https://open-meteo.com)) |
 | As conversas e a IA que responde | Busca na web (abre no seu navegador; o PI consulta a Wikipédia e os feeds de notícias) e leitura das páginas que você pedir |
 | A imagem da câmera | Gmail e Agenda do Google, se você conectar |
 | Memória, base de documentos e lembretes | Navegador, nos sites que você pedir |

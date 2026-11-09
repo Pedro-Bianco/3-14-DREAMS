@@ -1,7 +1,7 @@
 """One instance per user.
 
 Two open copies listened to the same microphone and doubled the LLM queue (measured
-2026-10-16). The second instance brings the first one's window to the front and exits.
+2026-10-16). The second instance wakes the first one (it may be asleep in the tray) and exits.
 """
 
 import ctypes
@@ -24,7 +24,12 @@ def acquire(window_title: str) -> bool:
     if ctypes.get_last_error() != _ERROR_ALREADY_EXISTS:
         return True
 
-    user32 = ctypes.windll.user32
+    from pidreams.ui.tray import wake_running_copy
+
+    if wake_running_copy():
+        log.info("PI dreams is already open; asked it to wake")
+        return False
+    user32 = ctypes.windll.user32                 # an older copy without the tray icon
     window = user32.FindWindowW(None, window_title)
     if window:
         user32.ShowWindow(window, _SW_RESTORE)

@@ -15,6 +15,7 @@ datas = [
     (str(ROOT / "pidreams" / "assets" / "world_50m_outline.npy"), "pidreams/assets"),   # globe zoomed in (planes)
     (str(ROOT / "pidreams" / "agent" / "personas"), "pidreams/agent/personas"),
     (str(ROOT / "pidreams" / "assets" / "voices"), "pidreams/assets/voices"),   # default voice state
+    (str(ROOT / "pidreams" / "assets" / "pidreams.ico"), "pidreams/assets"),   # tray icon
 ]
 datas += collect_data_files("faster_whisper")          # voice filter model (Silero)
 datas += collect_data_files("pocket_tts")             # default voice: model configs (weights downloaded at install)
@@ -57,6 +58,6 @@ exe = EXE(
     exclude_binaries=True,
     name="PIDreams",
     console=False,
-    icon=str(ROOT / "installer" / "assets" / "pidreams.ico"),
+    icon=str(ROOT / "pidreams" / "assets" / "pidreams.ico"),
 )
 coll = COLLECT(exe, a.binaries, a.datas, name="PIDreams")

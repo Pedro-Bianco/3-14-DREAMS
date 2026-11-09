@@ -9,6 +9,7 @@ import math
 import re
 
 from pidreams.core.settings import SETTINGS
+from pidreams.core.text import asks_to_close, asks_to_open
 from pidreams.monitor import sources, world
 
 CLOSE_PHRASES = {"fechar monitoramento", "fecha o monitoramento", "fechar o monitoramento", "sair do monitoramento",
@@ -56,12 +57,17 @@ def direct_command(text: str) -> str | None:
 
 
 def is_close_request(text: str) -> bool:
-    return _phrase(text) in CLOSE_PHRASES
+    """Free wording too: "sair do modo de monitoramento" missed the list and the model only
+    answered that the user could close it."""
+    phrase = _phrase(text)
+    return phrase in CLOSE_PHRASES or asks_to_close(phrase, "monitoramento")
 
 
 def is_open_request(text: str) -> bool:
-    """Opening is decided by code too: asked by voice, the normal agent said it knew no such app."""
-    return _phrase(text) in OPEN_PHRASES
+    """Opening is decided by code too: asked by voice, the normal agent said it knew no such app;
+    with free wording it ran open_app("monitoramento")."""
+    phrase = _phrase(text)
+    return phrase in OPEN_PHRASES or asks_to_open(phrase, "monitoramento")
 
 
 def prompt() -> str:
