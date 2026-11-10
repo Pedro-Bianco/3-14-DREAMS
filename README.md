@@ -457,6 +457,9 @@ python -m venv .venv-dev
   instalador fica em `installer`.
 - **Build do instalador**: `powershell -ExecutionPolicy Bypass -File installer\build.ps1`
   (precisa do [Inno Setup 6](https://jrsoftware.org/isinfo.php)).
+- **Contribuir**: veja [CONTRIBUTING.md](CONTRIBUTING.md) (regras do projeto e como testar),
+  [CHANGELOG.md](CHANGELOG.md) (o que mudou em cada versão) e [SECURITY.md](SECURITY.md) (como
+  relatar uma falha em particular).
 
 ## Construído com
 

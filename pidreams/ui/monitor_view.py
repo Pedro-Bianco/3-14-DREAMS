@@ -4,6 +4,7 @@ shows its own notice."""
 
 import datetime
 import logging
+import math
 import threading
 import time
 import tkinter as tk
@@ -113,26 +114,52 @@ class MonitorView(tk.Frame):
         self._close_info()
 
     def _load(self) -> None:
-        notes = []
-        try:
-            sats, age = sat_mod.load()
-            self.after(0, lambda: self.globe.set_satellites(sats))
-            self.satellites = sats
-            old = " (órbitas antigas: posições aproximadas)" if age > sat_mod.STALE_AFTER_S else ""
-            hours = age / 3600
-            notes.append(f"{len(sats):,} satélites".replace(",", ".") +
-                         (f", órbitas de {hours:.0f} h atrás" if hours >= 1 else "") + old)
-        except sources.SourceError as e:
-            notes.append(str(e))
-        for name, fn, setter in (("terremotos", sources.quakes, self.globe.set_quakes),
-                                 ("rádios", sources.radios, self.globe.set_radios)):
+        """Each layer on its own thread, and the copy on disk first however old, replaced when the source
+        answers: one after the other, the 7.7 MB of orbits CelesTrak sends every 6 h kept the
+        satellites, earthquakes and radios off the globe for seconds (2026-11-10)."""
+        self._notes: dict[str, str] = {}
+        layers = (("satélites", "orbits", sources.ORBITS_MAX_AGE, self._show_satellites,
+                   lambda stale_ok: sat_mod.load(stale_ok)),
+                  ("terremotos", "quakes", sources.QUAKES_MAX_AGE, self.globe.set_quakes,
+                   lambda stale_ok: sources.quakes(math.inf) if stale_ok else sources.quakes()),
+                  ("rádios", "radios", sources.RADIOS_MAX_AGE, self.globe.set_radios,
+                   lambda stale_ok: sources.radios(math.inf) if stale_ok else sources.radios()))
+        for layer in layers:
+            threading.Thread(target=self._load_layer, args=layer, daemon=True).start()
+
+    def _load_layer(self, name, cache, max_age, show, fetch) -> None:
+        started = time.perf_counter()
+        age = sources.cache_age(cache)
+        for stale_ok in ((True, False) if age is not None and age >= max_age else (False,)):
             try:
-                data = fn()
-                self.after(0, lambda d=data, s=setter: s(d))
-                notes.append(f"{len(data):,} {name}".replace(",", "."))
+                data = fetch(stale_ok)
             except sources.SourceError as e:
-                notes.append(str(e))
-        self.after(0, lambda: self._status.set(" · ".join(notes)))
+                self._note(name, str(e))
+                return
+            self.after(0, lambda d=data: show(d))
+            self._note(name, self._describe(name, data))
+            log.info("[Monitor] %s on the globe after %.2f s%s", name, time.perf_counter() - started,
+                     " (old copy, updating)" if stale_ok else "")
+
+    def _show_satellites(self, loaded) -> None:
+        self.satellites = loaded[0]
+        self.globe.set_satellites(loaded[0])
+
+    @staticmethod
+    def _describe(name: str, data) -> str:
+        if name != "satélites":
+            return f"{len(data):,} {name}".replace(",", ".")
+        sats, age = data
+        hours = age / 3600
+        old = " (órbitas antigas: posições aproximadas)" if age > sat_mod.STALE_AFTER_S else ""
+        return (f"{len(sats):,} satélites".replace(",", ".") +
+                (f", órbitas de {hours:.0f} h atrás" if hours >= 1 else "") + old)
+
+    def _note(self, name: str, text: str) -> None:
+        """The status line keeps the layers in a fixed order, whichever answers first."""
+        self._notes[name] = text
+        line = " · ".join(self._notes[n] for n in ("satélites", "terremotos", "rádios") if n in self._notes)
+        self.after(0, lambda: self._status.set(line))
 
     # ── layers and picks ──
 

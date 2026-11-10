@@ -45,11 +45,17 @@ def _get(url: str, timeout: float = 15) -> bytes:
         return resp.read()
 
 
+def cache_age(name: str) -> float | None:
+    """Seconds since the disk copy of a source was saved; None without a copy."""
+    file = paths.cache_dir("monitor") / f"{name}.json"
+    return time.time() - file.stat().st_mtime if file.is_file() else None
+
+
 def _cached(name: str, max_age: float, fetch, what: str):
     """(data, age in seconds) from the disk cache, fetching again when older than max_age. When
     the fetch fails, an old copy is still better than nothing (satellites keep moving offline)."""
     file = paths.cache_dir("monitor") / f"{name}.json"
-    age = time.time() - file.stat().st_mtime if file.is_file() else None
+    age = cache_age(name)
     if age is not None and age < max_age:
         return json.loads(file.read_text(encoding="utf-8")), age
     try:
@@ -233,9 +239,9 @@ def parse_quakes(raw: bytes) -> list[dict]:
     return sorted(out, key=lambda q: -q["mag"])
 
 
-def quakes() -> list[dict]:
+def quakes(max_age: float = QUAKES_MAX_AGE) -> list[dict]:
     """M2.5+ earthquakes of the last 24 h, strongest first."""
-    data, _age = _cached("quakes", QUAKES_MAX_AGE, lambda: parse_quakes(
+    data, _age = _cached("quakes", max_age, lambda: parse_quakes(
         _get("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson")), "os terremotos")
     return data
 
@@ -331,22 +337,22 @@ def _fetch_radios() -> list[dict]:
     raise SourceError("Nenhum servidor de rádios encontrado.")
 
 
-def radios() -> list[dict]:
-    data, _age = _cached("radios", RADIOS_MAX_AGE, _fetch_radios, "as rádios")
+def radios(max_age: float = RADIOS_MAX_AGE) -> list[dict]:
+    data, _age = _cached("radios", max_age, _fetch_radios, "as rádios")
     return data
 
 
 # ── satellites ──
 
-def orbits() -> tuple[list[dict], float]:
+def orbits(max_age: float = ORBITS_MAX_AGE) -> tuple[list[dict], float]:
     """(OMM records of the active satellites, age of the copy in seconds)."""
-    return _cached("orbits", ORBITS_MAX_AGE, lambda: json.loads(_get(
+    return _cached("orbits", max_age, lambda: json.loads(_get(
         "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=json", 60)), "as órbitas dos satélites")
 
 
-def satellite_owners() -> dict[str, str]:
+def satellite_owners(max_age: float = CATALOG_MAX_AGE) -> dict[str, str]:
     """{NORAD id: owner code}, from CelesTrak's catalog."""
-    data, _age = _cached("satcat", CATALOG_MAX_AGE, lambda: {
+    data, _age = _cached("satcat", max_age, lambda: {
         str(r["NORAD_CAT_ID"]): r.get("OWNER", "") for r in json.loads(_get(
             "https://celestrak.org/satcat/records.php?GROUP=active&FORMAT=json", 60))}, "o catálogo de satélites")
     return data

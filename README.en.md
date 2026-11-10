@@ -307,6 +307,10 @@ of them searches every tracked file for personal data and secrets. `tests/eval` 
 with the real models and sources (tool choice, memory, monitoring, deep research), run by hand:
 `python -m tests.eval.<name>`.
 
+Contributing (in Portuguese): [CONTRIBUTING.md](CONTRIBUTING.md) for the project rules,
+[CHANGELOG.md](CHANGELOG.md) for what changed in each version and [SECURITY.md](SECURITY.md) to
+report a vulnerability privately.
+
 ## Built with
 
 [Ollama](https://ollama.com) and [Qwen](https://github.com/QwenLM) models,

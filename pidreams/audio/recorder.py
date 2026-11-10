@@ -9,6 +9,19 @@ from pidreams.core.config import CONFIG
 
 log = logging.getLogger(__name__)
 
+# The speech threshold comes from the room's quiet moments (20th percentile of the chunk levels), not the
+# mean: one loud sound during the 1.5 s calibration measured 0.055 against the usual 0.002-0.006, the
+# threshold went over the user's voice, speech never "started" and every recording ran to the 30 s cap
+# (2026-11-09). The cap is below normal speech levels for the same reason.
+_QUIET_PERCENTILE = 20
+_MIN_THRESHOLD, _MAX_THRESHOLD = 0.004, 0.02
+
+
+def _threshold_from(levels: list[float]) -> tuple[float, float]:
+    """Chunk levels (rms) of a stretch of room sound → (noise floor, speech threshold)."""
+    noise = float(np.percentile(levels, _QUIET_PERCENTILE))
+    return noise, min(max(noise * 1.8, _MIN_THRESHOLD), _MAX_THRESHOLD)
+
 
 class AudioRecorder:
     def __init__(self, mic_device_ref: list | None = None):
@@ -61,8 +74,7 @@ class AudioRecorder:
                     await asyncio.sleep(0.02)
 
         if samples:
-            noise_rms = float(np.sqrt(np.mean(np.concatenate(samples) ** 2)))
-            self._threshold = min(max(noise_rms * 1.8, 0.004), 0.05)
+            noise_rms, self._threshold = _threshold_from([float(np.sqrt(np.mean(c ** 2))) for c in samples])
             log.info(f"[VAD] Ambient noise: {noise_rms:.4f} -> threshold: {self._threshold:.4f}")
         else:
             log.warning(f"[VAD] Calibration failed, using the default threshold: {self._threshold:.4f}")
@@ -71,6 +83,7 @@ class AudioRecorder:
         self._flush_queue()
 
         frames: list[np.ndarray] = []
+        levels: list[float] = []
         silent_chunks = 0
         speaking_started = False
         _, silence_needed, max_chunks = self._chunks_timing()
@@ -87,6 +100,7 @@ class AudioRecorder:
 
                 rms = float(np.sqrt(np.mean(chunk ** 2)))
                 frames.append(chunk)
+                levels.append(rms)
 
                 if rms > self._threshold:
                     if not speaking_started:
@@ -100,6 +114,13 @@ class AudioRecorder:
 
         if not frames:              # cancelled before any audio arrived (closing, switching mode)
             return np.array([], dtype=np.float32)
+        if not speaking_started and len(frames) >= max_chunks:
+            # A whole recording without crossing the threshold: if the room is quieter than it was at
+            # calibration, the threshold is relearned from this recording's quiet moments.
+            noise, threshold = _threshold_from(levels)
+            if threshold < self._threshold:
+                log.info("[VAD] threshold %.4f -> %.4f (room noise now %.4f)", self._threshold, threshold, noise)
+                self._threshold = threshold
         return np.concatenate(frames, axis=0).flatten()
 
     def _echo_gain(self) -> float:

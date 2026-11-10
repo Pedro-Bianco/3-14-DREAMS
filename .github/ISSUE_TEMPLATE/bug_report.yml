@@ -1,0 +1,55 @@
+name: Relatar um problema
+description: O PI não fez o que devia, travou ou não abriu.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por relatar! **Não inclua dados pessoais** (nomes, endereços, conversas, capturas
+        da tela inteira). Falha de segurança? Não abra issue: use a aba
+        **Security → Report a vulnerability**.
+  - type: textarea
+    id: what
+    attributes:
+      label: O que aconteceu
+      description: O que você pediu ou fez, o que esperava e o que o PI fez.
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Onde
+      options:
+        - Conversa por voz
+        - Conversa por texto
+        - Monitoramento
+        - Pesquisa profunda
+        - Memória ou Base de documentos
+        - Bandeja, palmas ou lembretes
+        - Instalação ou abertura do app
+        - Outro
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Trecho do log
+      description: |
+        De `%LOCALAPPDATA%\PIDreams\logs\pi_dreams.log`, perto do horário do problema. O log não
+        guarda o texto das conversas, mas confira antes de colar.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Versão do PI dreams
+      description: Configurações do Windows → Aplicativos → Aplicativos instalados → PI dreams.
+      placeholder: "1.2.0"
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Windows, placa de vídeo e RAM
+      placeholder: "Windows 11, Intel Arc B580 12 GB, 32 GB de RAM"
+    validations:
+      required: true

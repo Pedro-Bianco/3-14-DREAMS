@@ -57,3 +57,50 @@ def test_fala_bem_acima_do_eco_interrompe(monkeypatch):
 
 def test_sem_voz_tocando_vale_o_limite_de_sempre(monkeypatch):
     assert _barge_in(monkeypatch, [0.02] * 12, playback=0.0)
+
+
+def _recorder(monkeypatch, levels, threshold=0.004, max_chunks=100):
+    import contextlib
+    import queue
+
+    import numpy as np
+
+    from pidreams.audio import recorder as rec_mod
+
+    monkeypatch.setattr(rec_mod.sd, "InputStream", lambda **_kw: contextlib.nullcontext())
+    r = rec_mod.AudioRecorder.__new__(rec_mod.AudioRecorder)
+    r._queue, r._threshold = queue.Queue(), threshold
+    r._chunks_timing = lambda: (16, 19, max_chunks)
+    r._stream_kwargs = lambda: {}
+    r._flush_queue = lambda: None
+    for level in levels:
+        r._queue.put(np.full(1024, level, np.float32))
+    return r
+
+
+def test_barulho_na_calibracao_nao_esconde_a_voz(monkeypatch):
+    # 1.5 s of a quiet room with a loud sound in the middle: the mean gave 0.055 and the voice never
+    # crossed the threshold (2026-11-09).
+    import asyncio
+
+    r = _recorder(monkeypatch, [0.003] * 14 + [0.12] * 6 + [0.003] * 3)
+    asyncio.run(r.calibrate())                # reads the queued chunks for its 1.5 s
+    assert r._threshold < 0.01
+
+
+def test_teto_do_limite_fica_abaixo_da_voz():
+    from pidreams.audio.recorder import _threshold_from
+
+    assert _threshold_from([0.06] * 20)[1] <= 0.02
+
+
+def test_gravacao_inteira_sem_comecar_reaprende_o_limite(monkeypatch):
+    import asyncio
+
+    r = _recorder(monkeypatch, [0.003] * 70 + [0.015] * 30, threshold=0.05)
+    asyncio.run(r.record_until_silence())
+    assert r._threshold < 0.01
+    # the voice (0.015) now starts a recording and its silence ends it
+    r2 = _recorder(monkeypatch, [0.003] * 5 + [0.015] * 20 + [0.003] * 25, threshold=r._threshold)
+    audio = asyncio.run(r2.record_until_silence())
+    assert audio.size == (5 + 20 + 19) * 1024

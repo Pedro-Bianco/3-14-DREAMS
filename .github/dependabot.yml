@@ -1,0 +1,9 @@
+# Only the GitHub Actions versions. The Python packages stay pinned in requirements/ and are
+# updated by hand: a new version has to pass the installer build (which opens the packaged app)
+# and, for the models' runtimes, the speed measurements.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -96,12 +96,13 @@ class Satellites:
         return next((i for i, n in enumerate(self.names) if target in n.upper()), None)
 
 
-def load() -> tuple[Satellites, float]:
-    """(satellites, age of the orbits in seconds); raises SourceError without any copy."""
+def load(stale_ok: bool = False) -> tuple[Satellites, float]:
+    """(satellites, age of the orbits in seconds); raises SourceError without any copy. stale_ok: the
+    copy on disk however old (downloads only when there is none)."""
     from pidreams.monitor import sources
-    records, age = sources.orbits()
+    records, age = sources.orbits(math.inf) if stale_ok else sources.orbits()
     try:
-        owners = sources.satellite_owners()
+        owners = sources.satellite_owners(math.inf) if stale_ok else sources.satellite_owners()
     except sources.SourceError:
         owners = {}
     return Satellites(records, owners), age
