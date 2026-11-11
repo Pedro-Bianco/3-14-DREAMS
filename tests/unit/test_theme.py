@@ -73,3 +73,75 @@ def test_textos_de_tela_nao_ficam_em_caixa_alta():
 def test_janela_principal_se_chama_pi_dreams():
     texto = (UI / "main_window.py").read_text(encoding="utf-8")
     assert 'WINDOW_TITLE = "PI dreams"' in texto
+
+
+# ── tema Vidro ────────────────────────────────────────────────────────────────
+
+def _mistura(cor: str, fundo: str, alfa: float) -> str:
+    a = [int(cor[i:i + 2], 16) for i in (1, 3, 5)]
+    b = [int(fundo[i:i + 2], 16) for i in (1, 3, 5)]
+    return "#%02x%02x%02x" % tuple(round(x * alfa + y * (1 - alfa)) for x, y in zip(a, b))
+
+
+def test_texto_sobre_o_vidro_continua_legivel_com_uma_janela_branca_atras():
+    # O pior caso: o vidro tinge de BG o que está atrás; atrás, uma janela branca.
+    vidro = _mistura(theme.BG, "#FFFFFF", theme.TINT_ALPHA)
+    fracos = [(fg, round(contrast(fg, vidro), 2)) for fg in (theme.TEXT, theme.TEXT2, theme.MUTED, theme.CYAN,
+                                                            theme.VIOLET, theme.OK, theme.WARN, theme.DANGER)
+              if contrast(fg, vidro) < 4.5]
+    assert not fracos
+
+
+def test_vidro_troca_ao_vivo_e_volta_ao_neon(monkeypatch):
+    import tkinter as tk
+
+    monkeypatch.setattr(theme, "transparency_enabled", lambda: True)
+    monkeypatch.setattr(theme, "_set_acrylic", lambda root, on: True)   # o efeito do Windows fica fora
+    monkeypatch.setattr(theme, "_glass_on", [False])
+    root = tk.Tk()
+    root.configure(bg=theme.BG)
+    try:
+        fundo = tk.Frame(root, bg=theme.BG)
+        painel = tk.Frame(fundo, bg=theme.GLASS)
+        rotulo = tk.Label(painel, text="Conversa", bg=theme.GLASS)
+        campo = tk.Entry(painel, bg=theme.INPUT)
+        lista = theme.keep_solid(tk.Frame(painel, bg=theme.GLASS))
+        item = tk.Label(lista, text="Notepad", bg=theme.GLASS)
+        outra = tk.Toplevel(root, bg=theme.GLASS)                   # outras janelas ficam sólidas
+        for w in (fundo, painel, rotulo, campo, lista, item):
+            w.pack()
+
+        assert theme.apply_theme(root, "vidro")
+        assert [w["bg"] for w in (root, fundo, painel, rotulo)] == [theme.GLASS_KEY] * 4
+        assert campo["bg"] == theme.INPUT
+        assert lista["bg"] == item["bg"] == theme.GLASS
+        assert outra["bg"] == theme.GLASS
+        assert theme.surface() == theme.GLASS_KEY
+
+        novo = tk.Label(painel, text="aparece depois", bg=theme.GLASS)   # ex.: um cartão criado mais tarde
+        novo.pack()
+        root.update()
+        assert novo["bg"] == theme.GLASS_KEY
+        filho = tk.Label(painel, text="herda do pai", bg=painel["bg"])
+        filho.pack()
+
+        assert not theme.apply_theme(root, "neon")
+        assert [w["bg"] for w in (root, fundo, painel, rotulo, novo, filho)] == [
+            theme.BG, theme.BG, theme.GLASS, theme.GLASS, theme.GLASS, theme.GLASS]
+        assert theme.surface() == theme.GLASS
+    finally:
+        root.destroy()
+
+
+def test_sem_transparencia_no_windows_o_vidro_fica_solido(monkeypatch):
+    import tkinter as tk
+
+    monkeypatch.setattr(theme, "transparency_enabled", lambda: False)
+    monkeypatch.setattr(theme, "_glass_on", [False])
+    root = tk.Tk()
+    try:
+        painel = tk.Frame(root, bg=theme.GLASS)
+        assert not theme.apply_theme(root, "vidro")
+        assert painel["bg"] == theme.GLASS
+    finally:
+        root.destroy()

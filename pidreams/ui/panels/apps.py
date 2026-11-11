@@ -31,7 +31,7 @@ class AppsPanelMixin:
         tk.Frame(parent, bg=theme.BORDER, height=1).pack(side=tk.BOTTOM, fill=tk.X)
 
         # Scrollable checkboxes
-        list_outer = tk.Frame(parent, bg=theme.GLASS)
+        list_outer = theme.keep_solid(tk.Frame(parent, bg=theme.GLASS))   # scrolled: solid on the glass
         list_outer.pack(fill=tk.BOTH, expand=True, padx=(pad, theme.px(4)), pady=theme.px(6))
         scrollbar = ttk.Scrollbar(list_outer, orient="vertical")
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)

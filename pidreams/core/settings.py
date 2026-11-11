@@ -25,6 +25,7 @@ DEFAULTS: dict[str, Any] = {
     "treatment": "",
     "persona_id": "espirituoso",
     "appearance": "rosto",       # id from pidreams/ui/appearances (unknown = rosto)
+    "theme": "neon",             # "neon" (solid) or "vidro" (main window over frosted glass)
     # startup_sound: the chime played with the startup animation (audio/startup_sound.py).
     "audio": {"input_device": None, "output_device": None, "volume": 1.0, "startup_sound": True},
     # effect: "" = off. wake_name: in voice mode, answer only speech that starts with the name.
@@ -68,7 +69,8 @@ _RANGES = {
 }
 _LENGTHS = {"assistant_name": (1, 40), "treatment": (0, 40)}
 # Fields that take one of a fixed set of values.
-_CHOICES = {"voice.effect": {"", "leve", "medio", "forte"}, "stt.engine": {"auto", "small", "turbo"}}
+_CHOICES = {"voice.effect": {"", "leve", "medio", "forte"}, "stt.engine": {"auto", "small", "turbo"},
+            "theme": {"neon", "vidro"}}
 # Fields whose default is None but that accept text.
 _TEXT_OR_NULL = {"audio.input_device", "audio.output_device", "llm.model"}
 # Free-form dictionaries (keys defined by the user or by plugins).

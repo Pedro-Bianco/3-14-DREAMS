@@ -37,6 +37,7 @@ class SettingsDialog:
             "treatment": tk.StringVar(value=settings.get("treatment")),
             "persona_id": tk.StringVar(value=conduct.load(settings.get("persona_id"))["id"]),
             "appearance": tk.StringVar(value=settings.get("appearance")),
+            "theme": tk.StringVar(value=settings.get("theme")),
             **{f"resumo.{part}": tk.BooleanVar(value=settings.get(f"resumo.{part}"))
                for part in ("ligado", "toda_vez", "clima", "agenda", "emails", "lembretes")},
             "audio.input_device": tk.StringVar(value=settings.get("audio.input_device") or _DEFAULT_DEVICE),
@@ -107,6 +108,14 @@ class SettingsDialog:
         line.pack(fill=tk.X)
         for id_, name in appearances.names().items():
             self._radio(line, name, id_, self.v["appearance"]).pack(side=tk.LEFT, padx=(0, theme.px(10)))
+        self._label(tab, "Tema")
+        line = tk.Frame(tab, bg=theme.GLASS)
+        line.pack(fill=tk.X)
+        for id_, name in theme.THEMES.items():
+            self._radio(line, name, id_, self.v["theme"]).pack(side=tk.LEFT, padx=(0, theme.px(10)))
+        if not theme.transparency_enabled():
+            self._label(tab, "O Vidro precisa dos efeitos de transparência do Windows (Configurações → "
+                             "Personalização → Cores); com eles desligados a janela fica sólida.", dim=True)
         self._label(tab, "Resumo ao abrir")
         # One choice on screen, two saved flags (ligado, toda_vez): settings saved before stay valid.
         when = tk.StringVar(value=_BRIEFING_WHEN_LABEL[(self.v["resumo.ligado"].get(), self.v["resumo.toda_vez"].get())]

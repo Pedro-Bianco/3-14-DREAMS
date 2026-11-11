@@ -57,3 +57,11 @@ def test_o_log_nao_guarda_o_que_foi_dito_por_padrao(tmp_path, monkeypatch):
     assert logging_setup.said("me lembra de pagar a conta") == "[texto oculto]"
     s.set("privacy.log_speech", True)
     assert logging_setup.said("me lembra de pagar a conta") == "me lembra de pagar a conta"
+
+
+def test_tema_aceita_neon_e_vidro_e_volta_ao_neon_se_invalido(tmp_path):
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps({"theme": "vidro"}), encoding="utf-8")
+    assert Settings(path).get("theme") == "vidro"
+    path.write_text(json.dumps({"theme": "transparente"}), encoding="utf-8")
+    assert Settings(path).get("theme") == "neon"

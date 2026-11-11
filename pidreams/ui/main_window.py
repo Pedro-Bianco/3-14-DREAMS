@@ -175,6 +175,7 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         self._mem_list:          tk.Text | None      = None
 
         self._build_ui()
+        theme.apply_theme(self.root, SETTINGS.get("theme"))
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._apply_allowed_apps(self._apps_config)
 
@@ -238,8 +239,8 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
                  padx=theme.px(18)).pack(side=tk.LEFT)
 
         # Hardware in use. Click = run the detection again.
-        self._hw_label = tk.Label(hdr, text="detectando hardware…", bg=theme.GLASS,
-                                  fg=theme.MUTED, font=theme.FONT_SMALL, cursor="hand2")
+        self._hw_label = theme.keep_solid(tk.Label(hdr, text="detectando hardware…", bg=theme.GLASS,
+                                                   fg=theme.MUTED, font=theme.FONT_SMALL, cursor="hand2"))
         self._hw_label.pack(side=tk.LEFT)
         self._hw_label.bind("<Button-1>", lambda _e: self._refresh_hardware(redetect=True))
         # Ollama only logs the GPU it uses after starting up: check again later.
@@ -308,7 +309,7 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
              ("services", "Serviços"), ("kb", "Base"))
 
     def _build_left_panel(self, parent):
-        tab_bar = tk.Frame(parent, bg=theme.GLASS)
+        tab_bar = theme.keep_solid(tk.Frame(parent, bg=theme.GLASS))   # clicked: solid on the glass
         tab_bar.pack(fill=tk.X, padx=theme.px(10), pady=(theme.px(10), 0))
         self._tab_buttons: dict[str, tuple[tk.Label, tk.Canvas]] = {}
         for col, (key, text) in enumerate(self._TABS):
@@ -567,7 +568,8 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
                  anchor="w").grid(row=0, column=0, sticky="ew", padx=theme.px(18), pady=(theme.px(12), theme.px(10)))
         tk.Frame(parent, bg=theme.BORDER, height=1).grid(row=1, column=0, sticky="ew")
 
-        chat_box = tk.Frame(parent, bg=theme.GLASS)
+        # Solid even in the "vidro" theme: the wheel and the selection must reach the text.
+        chat_box = theme.keep_solid(tk.Frame(parent, bg=theme.GLASS))
         chat_box.grid(row=2, column=0, sticky="nsew")
         scrollbar = ttk.Scrollbar(chat_box, orient="vertical")
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, theme.px(4)), pady=theme.px(4))
@@ -869,7 +871,10 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
             if label_text is not None and var.get() != label_text:
                 var.set(label_text)
         self._warn_missing_devices()
-        if st.get("appearance") != self._sphere.id and not self._boot:      # booting: applied at the end
+        glass_was = theme.surface()
+        theme.apply_theme(self.root, st.get("theme"))
+        changed = st.get("appearance") != self._sphere.id or theme.surface() != glass_was
+        if changed and not self._boot:      # booting: applied at the end
             self._switch_appearance(st.get("appearance"))
 
     def _warn_missing_devices(self):
@@ -941,7 +946,7 @@ class AgentApp(ServicesPanelMixin, MemoryPanelMixin, KBPanelMixin,
         if self._sphere:
             self._sphere.stop()
             self._sphere.destroy()
-        self._sphere = appearances.create(id_, self._appearance_frame, size=self._appearance_size, bg=theme.GLASS,
+        self._sphere = appearances.create(id_, self._appearance_frame, size=self._appearance_size, bg=theme.surface(),
                                         on_fail=lambda: self._switch_appearance(appearances.fallback(self._sphere.id)))
         self._sphere.set_state(self._appearance_state)
         self._sphere.pack()

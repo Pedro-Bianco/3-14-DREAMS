@@ -34,7 +34,7 @@ class MonitorView(tk.Frame):
         self.satellites = None
         self._loaded = False
 
-        bar = tk.Frame(self, bg=theme.GLASS)
+        bar = theme.keep_solid(tk.Frame(self, bg=theme.GLASS))   # layer checkboxes: solid on the glass
         bar.pack(fill=tk.X)
         tk.Label(bar, text=f"{theme.ICON['globe']}  Monitoramento", bg=theme.GLASS, fg=theme.TEXT,
                  font=theme.FONT_SECTION).pack(side=tk.LEFT, padx=theme.px(12), pady=theme.px(8))

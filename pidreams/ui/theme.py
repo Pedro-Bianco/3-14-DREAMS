@@ -201,6 +201,127 @@ def glass(parent, hi: bool = False, **kw) -> tk.Frame:
     return frame
 
 
+# ── Themes: "neon" (solid colors) or "vidro" (the main window over frosted glass) ──
+THEMES = {"neon": "Neon", "vidro": "Vidro"}
+# Painted where the frosted glass shows through. Those pixels also let the mouse through (measured:
+# the click and the wheel reach the window behind), so whatever is clicked or scrolled stays solid
+# (keep_solid). Text on it is fine: its anti-aliased edge is near black on a dark tint.
+GLASS_KEY = "#010203"
+# Acrylic tint, ABGR order: color BG at 90%, the level that keeps MUTED readable with a white window
+# behind (4.75:1 in pi-translator's measurement; tests/unit/test_theme.py recomputes it).
+TINT_ALPHA = 0.90
+TINT_ABGR = (round(TINT_ALPHA * 255) << 24) | 0x1F0B07
+_glass_on = [False]
+
+
+class _AccentPolicy(ctypes.Structure):
+    _fields_ = [("AccentState", ctypes.c_int), ("AccentFlags", ctypes.c_int),
+                ("GradientColor", ctypes.c_uint), ("AnimationId", ctypes.c_int)]
+
+
+class _CompositionData(ctypes.Structure):
+    _fields_ = [("Attribute", ctypes.c_int), ("Data", ctypes.c_void_p), ("SizeOfData", ctypes.c_size_t)]
+
+
+def transparency_enabled() -> bool:
+    """Windows' "Transparency effects" switch (Settings > Personalization > Colors)."""
+    try:
+        import winreg
+
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize") as key:
+            return bool(winreg.QueryValueEx(key, "EnableTransparency")[0])
+    except OSError:
+        return True  # absent on a fresh install, where the effect is on
+
+
+def _set_acrylic(root: tk.Tk, on: bool) -> bool:
+    try:
+        root.update_idletasks()
+        hwnd = ctypes.windll.user32.GetParent(root.winfo_id())
+        dark = ctypes.c_int(1 if on else 0)     # dark title bar over the glass
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 20, ctypes.byref(dark), ctypes.sizeof(dark))
+        policy = _AccentPolicy(4 if on else 0, 2, TINT_ABGR, 0)  # 4 = ACCENT_ENABLE_ACRYLICBLURBEHIND
+        data = _CompositionData(19, ctypes.cast(ctypes.pointer(policy), ctypes.c_void_p), ctypes.sizeof(policy))
+        if not ctypes.windll.user32.SetWindowCompositionAttribute(hwnd, ctypes.byref(data)) and on:
+            return False
+        root.wm_attributes("-transparentcolor", GLASS_KEY if on else "")
+        return True
+    except (AttributeError, OSError, tk.TclError):
+        return False
+
+
+def keep_solid(widget: tk.Misc) -> tk.Misc:
+    """This widget and everything inside it keep their colors in the "vidro" theme."""
+    widget._theme_solid = True
+    return widget
+
+
+def _glassable(w) -> bool:
+    if isinstance(w, tk.Tk):
+        return True
+    if not isinstance(w, tk.Widget) or isinstance(w, tk.Toplevel):
+        return False
+    node = w
+    while node is not None:
+        if getattr(node, "_theme_solid", False) or isinstance(node, tk.Toplevel):
+            return False
+        node = node.master
+    return True
+
+
+def _paint(w) -> None:
+    """Background of one main-window widget for the current theme."""
+    try:
+        bg = w.cget("bg")
+    except (tk.TclError, AttributeError):
+        return
+    if _glass_on[0]:
+        if bg in (BG, GLASS) and _glassable(w):
+            w._theme_bg = bg
+            w.configure(bg=GLASS_KEY)
+            if "activebackground" in w.keys() and w.cget("activebackground") == bg:
+                w.configure(activebackground=GLASS_KEY)
+    elif bg == GLASS_KEY:
+        # Created while the glass was on (it took its parent's color): back to the parent's.
+        solid = getattr(w, "_theme_bg", None) or getattr(w.master, "_theme_bg", GLASS)
+        w.configure(bg=solid)
+        if "activebackground" in w.keys() and w.cget("activebackground") == GLASS_KEY:
+            w.configure(activebackground=solid)
+
+
+def _paint_tree(w) -> None:
+    _paint(w)
+    for child in w.winfo_children():
+        if not isinstance(child, tk.Toplevel):
+            _paint_tree(child)
+
+
+def apply_theme(root: tk.Tk, name: str) -> bool:
+    """Switches the main window between the themes, live. Returns whether the glass is on: off for
+    "neon", and also when Windows' transparency effects are off or the effect is unavailable (the
+    window then stays solid, which is a look, not an error). Other windows always stay solid."""
+    want = name == "vidro" and transparency_enabled()
+    if want == _glass_on[0]:
+        return want
+    if want and not _set_acrylic(root, True):
+        return False
+    if not want:
+        _set_acrylic(root, False)
+    _glass_on[0] = want
+    if not getattr(root, "_theme_map_hook", False):
+        # Widgets built later (tab contents, cards, rows) follow the theme when they show up.
+        root.bind_all("<Map>", lambda e: _glass_on[0] and _paint(e.widget), add="+")
+        root._theme_map_hook = True
+    _paint_tree(root)
+    return want
+
+
+def surface() -> str:
+    """Color for something drawn on the panels (e.g. an appearance's background image)."""
+    return GLASS_KEY if _glass_on[0] else GLASS
+
+
 def gradient(canvas: tk.Canvas, width: int, height: int, horizontal: bool = True) -> None:
     """Cyan → violet stripe drawn once (header line, active tab, rings)."""
     canvas.delete("gradient")

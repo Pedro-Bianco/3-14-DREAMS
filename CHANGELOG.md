@@ -6,6 +6,13 @@ notas completas na [página de releases](https://github.com/Pedro-Bianco/3-14-DR
 
 ## [Não lançado]
 
+## [1.3.0] - 2026-11-11
+
+### Adicionado
+
+- Tema Vidro (Configurações → Geral → Tema): a janela principal sobre vidro fosco do Windows, com
+  a conversa, as listas e o mapa da memória sólidos. Troca na hora; o tema Neon continua o padrão.
+
 ## [1.2.1] - 2026-11-11
 
 ### Melhorado
@@ -120,7 +127,8 @@ notas completas na [página de releases](https://github.com/Pedro-Bianco/3-14-DR
 - Revisão de licenças e termos de uso: câmera com o Qwen3-VL 2B (Apache-2.0), rádios pelo DNS do
   Radio Browser e licenças documentadas em `THIRD_PARTY_NOTICES.md`.
 
-[Não lançado]: https://github.com/Pedro-Bianco/3-14-DREAMS/compare/v1.2.1...HEAD
+[Não lançado]: https://github.com/Pedro-Bianco/3-14-DREAMS/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Pedro-Bianco/3-14-DREAMS/releases/tag/v1.3.0
 [1.2.1]: https://github.com/Pedro-Bianco/3-14-DREAMS/releases/tag/v1.2.1
 [1.2.0]: https://github.com/Pedro-Bianco/3-14-DREAMS/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Pedro-Bianco/3-14-DREAMS/releases/tag/v1.1.0
