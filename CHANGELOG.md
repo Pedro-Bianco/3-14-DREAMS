@@ -6,6 +6,8 @@ notas completas na [página de releases](https://github.com/Pedro-Bianco/3-14-DR
 
 ## [Não lançado]
 
+## [1.2.1] - 2026-11-11
+
 ### Melhorado
 
 - O Monitoramento mostra satélites, terremotos e rádios na hora: as camadas carregam ao mesmo
@@ -16,6 +18,7 @@ notas completas na [página de releases](https://github.com/Pedro-Bianco/3-14-DR
 - Um barulho durante a calibração do microfone não impede mais o PI de perceber o fim da fala.
 - No modo voz, texto digitado interrompe a escuta e é respondido em voz.
 - A Base responde com documentos curtos (com poucos trechos, antes nada passava do limite).
+- O som de abertura ficou mais baixo (9 dB), perto do volume da voz do PI.
 
 ## [1.2.0] - 2026-11-09
 
@@ -117,7 +120,8 @@ notas completas na [página de releases](https://github.com/Pedro-Bianco/3-14-DR
 - Revisão de licenças e termos de uso: câmera com o Qwen3-VL 2B (Apache-2.0), rádios pelo DNS do
   Radio Browser e licenças documentadas em `THIRD_PARTY_NOTICES.md`.
 
-[Não lançado]: https://github.com/Pedro-Bianco/3-14-DREAMS/compare/v1.2.0...HEAD
+[Não lançado]: https://github.com/Pedro-Bianco/3-14-DREAMS/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/Pedro-Bianco/3-14-DREAMS/releases/tag/v1.2.1
 [1.2.0]: https://github.com/Pedro-Bianco/3-14-DREAMS/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Pedro-Bianco/3-14-DREAMS/releases/tag/v1.1.0
 [1.0.1]: https://github.com/Pedro-Bianco/3-14-DREAMS/releases/tag/v1.0.1
